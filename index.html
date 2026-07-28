@@ -59,8 +59,6 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 </head>
 <body>
 
-<div class="fixed inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(44,44,44,0.15)] z-10"></div>
-
 <div class="no-print wood-bar rounded-[1.5rem] px-4 py-3 mx-4 mt-4 mb-2 flex justify-between items-center z-20 sticky top-0 flex-wrap gap-2">
   <div class="flex items-center gap-4 flex-wrap">
     <div class="flex items-center gap-3">
@@ -1365,18 +1363,24 @@ if ('serviceWorker' in navigator) {
 // Startup
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
-  applyI18n();
-  document.getElementById('qrModeSelect').value = state.qrMode;
-  handleHash();
-  if (state.teacherName) {
-    document.getElementById('welcomeModal').classList.remove('active');
-    if (state.role === 'student') {
-      enterStudentMode();
+  try {
+    applyI18n();
+    const qrSel = document.getElementById('qrModeSelect');
+    if (qrSel) qrSel.value = state.qrMode;
+    handleHash();
+    if (state.teacherName) {
+      document.getElementById('welcomeModal').classList.remove('active');
+      if (state.role === 'student') {
+        enterStudentMode();
+      } else {
+        afterLogin();
+      }
     } else {
-      afterLogin();
+      document.getElementById('welcomeModal').classList.add('active');
     }
-  } else {
-    document.getElementById('welcomeModal').classList.add('active');
+  } catch (e) {
+    console.error('Startup error:', e);
+    alert('系統啟動發生錯誤，請重新整理頁面。');
   }
 });
 </script>
