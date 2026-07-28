@@ -138,7 +138,7 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
   <div class="retro-card p-3 mb-3">
     <h3 class="font-bold font-serif mb-1 text-sm">📥 匯入學生名單</h3>
     <p class="text-xs text-retro-ink/60 mb-1 font-serif">每行「座號 姓名」，例如：<code class="bg-gray-100 px-1">1 王小明</code></p>
-    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="1 王小明&#10;2 陳小華&#10;3 林小美&#10;4 李小明&#10;5 張小華"></textarea>
+    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="可以直接輸入，不用空格：&#10;1王小明&#10;2陳小華&#10;3林小美&#10;（或 1 王小明 也可以）"></textarea>
     <div id="importPreview" class="hidden mb-2 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs font-serif">
       <div class="font-bold mb-1">📋 預覽：</div>
       <div id="previewContent"></div>
@@ -417,23 +417,56 @@ function switchMainTab(tab) {
 // ============================================================
 // 學生管理
 // ============================================================
+
+// 智能解析每一行學生資料：支持任何分隔或無分隔
+function parseStudentLine(rawLine) {
+  const line = rawLine.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); // 去除隱藏字符
+  if (!line) return null;
+  
+  // 全角數字轉半角
+  const fullToHalf = { '０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9' };
+  let normalized = '';
+  for (let c of line) { normalized += fullToHalf[c] || c; }
+  
+  // 嘗試1：傳統正則（有空格或分隔符）
+  let m = normalized.match(/^(\d+)[\s\t,，.、]*(.+)$/);
+  if (m) return { student_number: parseInt(m[1]), name: m[2].trim() };
+  
+  // 嘗試2：智能分割（數字後面自動切，不需要分隔符）
+  // 例如 "1王小明" → 1 + 王小明
+  let numStr = '';
+  let nameStr = '';
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized[i];
+    if (/\d/.test(c) && nameStr === '') {
+      numStr += c;
+    } else {
+      nameStr += c;
+    }
+  }
+  if (numStr && nameStr.trim()) {
+    return { student_number: parseInt(numStr), name: nameStr.trim() };
+  }
+  
+  return null;
+}
+
 function previewImport() {
   const input = document.getElementById('studentInput').value;
   const previewDiv = document.getElementById('importPreview');
   const contentDiv = document.getElementById('previewContent');
   if (!input || !input.trim()) { previewDiv.classList.add('hidden'); return; }
   
-  const lines = input.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim());
+  const lines = input.replace(/\r\n/g, '\n').split('\n');
   const students = [];
   const errors = [];
   
   lines.forEach((line, idx) => {
-    const trimmed = line.trim();
-    const m = trimmed.match(/^(\d+)[\s\t,，.、]*(.+)$/);
-    if (m) {
-      students.push({ student_number: parseInt(m[1]), name: m[2].trim() });
-    } else {
-      errors.push({ line: idx+1, text: trimmed });
+    const result = parseStudentLine(line);
+    if (result) {
+      students.push(result);
+    } else if (line.trim()) {
+      errors.push({ line: idx+1, text: line.trim() });
     }
   });
   
@@ -445,7 +478,7 @@ function previewImport() {
   if (errors.length > 0) {
     html += '<div class="text-red-600 mt-1">❌ 格式錯誤 ' + errors.length + ' 行：</div>';
     html += errors.map(e => '<div class="text-red-400">第' + e.line + '行「' + e.text + '」</div>').join('');
-    html += '<div class="text-retro-ink/60 mt-1">💡 正確格式：座號 + 空格 + 姓名，例如「1 王小明」</div>';
+    html += '<div class="text-retro-ink/60 mt-1">💡 直接打「1王小明」也可以，數字和姓名不用空格</div>';
   }
   
   contentDiv.innerHTML = html;
@@ -471,25 +504,21 @@ async function importStudents() {
   if (!input || !input.trim()) { result.textContent = '❌ 請輸入資料'; return; }
   if (!state.currentClassId) { result.textContent = '❌ 請先建立或選擇班級'; return; }
   
-  // Handle both \n and \r\n line endings
-  const lines = input.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim());
+  const lines = input.replace(/\r\n/g, '\n').split('\n');
   const students = [];
   const errors = [];
   
   lines.forEach((line, idx) => {
-    const trimmed = line.trim();
-    // Match: number + separator + name
-    // Supports: "1 王小明", "1\t王小明", "1,王小明", "1.王小明", "1、王小明", "1王小明" (no separator)
-    const m = trimmed.match(/^(\d+)[\s\t,，.、]*(.+)$/);
-    if (m) {
-      students.push({ class_id: state.currentClassId, student_number: parseInt(m[1]), name: m[2].trim(), qr_token: generateToken() });
-    } else {
-      errors.push('第' + (idx+1) + '行「' + trimmed + '」');
+    const parsed = parseStudentLine(line);
+    if (parsed) {
+      students.push({ class_id: state.currentClassId, student_number: parsed.student_number, name: parsed.name, qr_token: generateToken() });
+    } else if (line.trim()) {
+      errors.push('第' + (idx+1) + '行「' + line.trim() + '」');
     }
   });
   
   if (students.length === 0) { 
-    result.innerHTML = '❌ 格式錯誤<br><span class="text-xs text-retro-ink/60">請用「座號 姓名」格式，例如「1 王小明」</span>'; 
+    result.innerHTML = '❌ 格式錯誤<br><span class="text-xs text-retro-ink/60">直接輸入「1王小明」或「1 王小明」都可以</span>'; 
     return; 
   }
   
@@ -498,10 +527,11 @@ async function importStudents() {
     if (error) throw error;
     let msg = '✅ 匯入 ' + (data ? data.length : students.length) + ' 人';
     if (errors.length > 0) {
-      msg += '<br><span class="text-xs text-orange-600">⚠️ 以下 ' + errors.length + ' 行未匯入：' + errors.slice(0,3).join('、') + (errors.length > 3 ? '...' : '') + '</span>';
+      msg += '<br><span class="text-xs text-orange-600">⚠️ ' + errors.length + ' 行未匯入</span>';
     }
     result.innerHTML = msg;
     document.getElementById('studentInput').value = '';
+    document.getElementById('importPreview').classList.add('hidden');
     await loadClassData();
     renderStudents();
   } catch (e) { result.textContent = '❌ ' + e.message; }
