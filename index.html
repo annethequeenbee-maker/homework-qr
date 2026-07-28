@@ -111,6 +111,11 @@ tr:hover { background: #f9f9f9; }
 /* ===== 回頂部 ===== */
 #backToTop { display: none; position: fixed; bottom: 20px; right: 20px; z-index: 99; font-size: 20px; border: none; outline: none; background: #ff9f1c; color: white; cursor: pointer; width: 45px; height: 45px; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
 
+/* ===== 批量模式 ===== */
+.batch-check { position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; cursor: pointer; z-index: 2; }
+.student-btn { position: relative; }
+.student-btn.batch-selected { box-shadow: 0 0 0 3px #1d4e89; }
+
 /* ===== 列印 ===== */
 @media print { .no-print { display: none !important; } body { background: white; } .container { box-shadow: none; } }
 </style>
@@ -155,10 +160,14 @@ tr:hover { background: #f9f9f9; }
 <div id="tab-submit" class="tab-panel active">
   <div class="container">
     <div class="section-title">📋 作業繳交</div>
+    <div style="background: #e3f2fd; border: 1px solid #2196f3; color: #1565c0; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9em;">
+      ✅ 繳交資料<strong>自動即時儲存</strong>到雲端資料庫，無需額外操作。Google Sheets 匯出請到「📊 報表」頁面。
+    </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
       <label>選擇作業：</label>
       <select id="submitAssignmentSelect" style="min-width: 200px;"><option value="">-- 請選擇作業 --</option></select>
       <button onclick="loadSubmitView()" class="btn btn-darkblue" style="padding: 8px 20px;">載入全班</button>
+      <button onclick="toggleBatchMode()" class="btn btn-gray" id="batchModeBtn" style="padding: 8px 15px;">☐ 批量模式</button>
     </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-box status-pending"></div> 未繳交</div>
@@ -168,10 +177,22 @@ tr:hover { background: #f9f9f9; }
       <div class="legend-item"><div class="legend-box status-corrected"></div> 已訂正</div>
       <div class="legend-item"><div class="legend-box status-late"></div> 遲交</div>
     </div>
+    <div id="batchHint" class="hidden" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em;">
+      📌 批量模式：勾選要標記的學生，然後用下方按鈕批量操作
+    </div>
     <div id="submitStudentGrid" class="student-grid"></div>
     <div id="submitEmpty" class="hidden" style="text-align: center; color: #999; padding: 40px;">
       <div style="font-size: 2em; margin-bottom: 10px;">👆</div>
       <div>請先選擇作業並點「載入全班」</div>
+    </div>
+    <!-- 批量操作浮動欄 -->
+    <div id="batchBar" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+      <span style="align-self: center; font-weight: bold;">已選 <span id="batchCount">0</span> 人</span>
+      <button onclick="batchMark('submitted')" class="btn btn-green" style="padding: 8px 20px;">✅ 批量已繳</button>
+      <button onclick="batchMark('missing')" class="btn btn-red" style="padding: 8px 20px;">❌ 批量缺交</button>
+      <button onclick="batchMark('pending')" class="btn btn-gray" style="padding: 8px 20px;">○ 批量未繳</button>
+      <button onclick="clearBatchSelection()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">清除選擇</button>
+      <button onclick="toggleBatchMode()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">退出批量</button>
     </div>
   </div>
 </div>
@@ -261,13 +282,14 @@ tr:hover { background: #f9f9f9; }
       <button onclick="printReport()" class="btn btn-green">🖨️ 列印報表</button>
     </div>
     <div style="margin-top: 20px; padding: 15px; background: #f0f4f8; border-radius: 6px;">
-      <div style="font-weight: bold; color: #1d4e89; margin-bottom: 8px;">☁️ Google Sheets 同步</div>
-      <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">將全班繳交狀況一鍵傳送到 Google Sheets：</p>
+      <div style="font-weight: bold; color: #1d4e89; margin-bottom: 8px;">☁️ Google Sheets 額外匯出</div>
+      <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">所有繳交資料已<strong>自動即時儲存在 Supabase 雲端資料庫</strong>。這裡可以額外匯出一份到 Google Sheets 方便 Excel 操作：</p>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <input id="gasUrlInput" placeholder="貼上 Google Apps Script 網址" style="flex: 1; min-width: 250px;">
-        <button onclick="syncToGoogleSheet()" class="btn btn-darkblue">☁️ 同步到試算表</button>
+        <button onclick="syncToGoogleSheet()" class="btn btn-darkblue">☁️ 匯出到試算表</button>
       </div>
-      <p style="font-size: 0.8em; color: #999; margin-top: 8px;">💡 還沒有 GAS 網址？請先到「部署步驟」設定 Google Apps Script。</p>
+      <p style="font-size: 0.8em; color: #999; margin-top: 8px;">💡 沒有 GAS 網址？請點下方「設定 GAS」按鈕查看教學。</p>
+      <button onclick="showGASTutorial()" class="btn btn-gray" style="margin-top: 8px; padding: 6px 15px; font-size: 0.85em;">📖 如何設定 Google Apps Script</button>
     </div>
   </div>
 </div>
@@ -306,7 +328,9 @@ let state = {
   subjects: [],
   assignments: [],
   submissions: [],
-  currentAssignmentId: null
+  currentAssignmentId: null,
+  batchMode: false,
+  batchSelected: new Set()
 };
 
 // ============================================================
@@ -574,14 +598,91 @@ async function loadSubmitView() {
     if (sub) status = sub.status;
     else if (isPastDue) status = 'missing';
     const icon = { submitted:'✅', missing:'❌', needs_correction:'📝', corrected:'✔️', pending:'○', late:'⚠️' }[status];
-    return `<div class="student-btn ${statusClass(status)}" onclick="onStudentClick(${s.id}, '${status}')">
+    const checked = state.batchSelected.has(s.id) ? 'checked' : '';
+    const selectedClass = state.batchSelected.has(s.id) ? 'batch-selected' : '';
+    const checkboxHtml = state.batchMode ? `<input type="checkbox" class="batch-check" data-sid="${s.id}" ${checked} onclick="event.stopPropagation();toggleBatchItem(${s.id})">` : '';
+    return `<div class="student-btn ${statusClass(status)} ${selectedClass}" onclick="onStudentClick(${s.id}, '${status}')">
+      ${checkboxHtml}
       <div class="seat">${s.student_number}</div>
       <div class="name">${s.name}</div>
       <div class="status-icon">${icon}</div>
     </div>`;
   }).join('');
 }
+
+function toggleBatchMode() {
+  state.batchMode = !state.batchMode;
+  state.batchSelected.clear();
+  updateBatchUI();
+  // Reload grid to show/hide checkboxes
+  if (state.currentAssignmentId) loadSubmitView();
+}
+
+function toggleBatchItem(sid) {
+  if (state.batchSelected.has(sid)) state.batchSelected.delete(sid);
+  else state.batchSelected.add(sid);
+  updateBatchUI();
+}
+
+function updateBatchUI() {
+  const btn = document.getElementById('batchModeBtn');
+  const bar = document.getElementById('batchBar');
+  const hint = document.getElementById('batchHint');
+  if (state.batchMode) {
+    btn.textContent = '☑ 批量模式開啟';
+    btn.style.background = '#1d4e89';
+    btn.style.color = '#fff';
+    bar.classList.remove('hidden');
+    hint.classList.remove('hidden');
+  } else {
+    btn.textContent = '☐ 批量模式';
+    btn.style.background = '';
+    btn.style.color = '';
+    bar.classList.add('hidden');
+    hint.classList.add('hidden');
+  }
+  document.getElementById('batchCount').textContent = state.batchSelected.size;
+}
+
+function clearBatchSelection() {
+  state.batchSelected.clear();
+  updateBatchUI();
+  if (state.currentAssignmentId) loadSubmitView();
+}
+
+async function batchMark(newStatus) {
+  if (state.batchSelected.size === 0) { alert('請先勾選學生'); return; }
+  const sidList = Array.from(state.batchSelected);
+  try {
+    const isLate = state.assignments.find(a => a.id === state.currentAssignmentId)?.due_date < todayStr();
+    const finalStatus = (newStatus === 'submitted' && isLate) ? 'late' : newStatus;
+    // Process one by one
+    let count = 0;
+    for (const sid of sidList) {
+      const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', state.currentAssignmentId).eq('student_id', sid).single();
+      if (existing) {
+        await sb.from('submissions').update({ status: finalStatus, submitted_at: (finalStatus !== 'pending' && finalStatus !== 'missing') ? nowStr() : null, locked: (finalStatus === 'submitted' || finalStatus === 'late' || finalStatus === 'corrected') }).eq('id', existing.id);
+      } else if (finalStatus !== 'pending') {
+        await sb.from('submissions').insert({ assignment_id: state.currentAssignmentId, student_id: sid, status: finalStatus, submitted_at: nowStr(), locked: true });
+      }
+      count++;
+    }
+    alert('✅ 已批量標記 ' + count + ' 位學生為「' + statusLabel(finalStatus) + '」');
+    state.batchSelected.clear();
+    updateBatchUI();
+    await loadSubmitView();
+  } catch (e) { alert('批量操作失敗：' + e.message); }
+}
 async function onStudentClick(sid, currentStatus) {
+  // Batch mode: toggle checkbox
+  if (state.batchMode) {
+    toggleBatchItem(sid);
+    // Re-render just the checkbox without full reload
+    const checkbox = document.querySelector('.batch-check[data-sid="' + sid + '"]');
+    if (checkbox) checkbox.checked = state.batchSelected.has(sid);
+    return;
+  }
+  // Normal mode: single student action
   if (currentStatus === 'submitted' || currentStatus === 'late' || currentStatus === 'corrected') {
     // Check if locked
     const { data: existing } = await sb.from('submissions').select('locked').eq('assignment_id', state.currentAssignmentId).eq('student_id', sid).single();
@@ -879,6 +980,24 @@ function showModal(title, body) {
   document.getElementById('modalOverlay').classList.add('active');
 }
 function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+function showGASTutorial() {
+  showModal('☁️ Google Apps Script 設定教學', `
+    <div style="font-size:0.95em;line-height:1.6;">
+      <p><strong>資料已經在雲端了！</strong></p>
+      <p>所有繳交資料都自動即時儲存在 Supabase 雲端資料庫，不需要按任何按鈕。</p>
+      <p style="margin-top:10px;"><strong>Google Sheets 匯出是額外功能：</strong></p>
+      <ol style="padding-left:20px;">
+        <li>前往 <a href="https://script.google.com/" target="_blank">script.google.com</a> 建立新專案</li>
+        <li>貼入 gas-sync.gs 程式碼（專案資料夾裡有這個檔案）</li>
+        <li>點「部署」→「新增部署」→「網頁應用程式」</li>
+        <li>執行身分：我；存取權：任何人</li>
+        <li>複製網址貼到這裡，點「匯出到試算表」</li>
+      </ol>
+      <p style="margin-top:10px;color:#666;">💡 設定一次後，之後隨時可以一鍵匯出全班資料到 Excel。</p>
+    </div>
+    <button onclick="closeModal()" class="btn btn-gray" style="width:100%;margin-top:10px;">關閉</button>
+  `);
+}
 
 // ============================================================
 // 啟動
