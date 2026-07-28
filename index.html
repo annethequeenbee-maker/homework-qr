@@ -558,10 +558,14 @@ function renderSettings() {
   const asEl = document.getElementById('assignmentList');
   if (!state.assignments.length) { asEl.innerHTML = '<div style="color:#999;">尚無作業</div>'; }
   else {
-    asEl.innerHTML = '<table><thead><tr><th>科目</th><th>作業名稱</th><th>截止日</th></tr></thead><tbody>' +
+    asEl.innerHTML = '<table><thead><tr><th>科目</th><th>作業名稱</th><th>截止日</th><th>操作</th></tr></thead><tbody>' +
       state.assignments.map(a => {
         const subName = a.subjects ? a.subjects.name : '';
-        return `<tr><td>${subName}</td><td>${a.title}</td><td>${a.due_date || '無'}</td></tr>`;
+        return `<tr><td>${subName || '-'}</td><td>${a.title}</td><td>${a.due_date || '無'}</td>
+          <td>
+            <button onclick="editAssignment(${a.id})" class="btn btn-blue" style="padding:4px 10px;font-size:0.8em;">✏️ 編輯</button>
+            <button onclick="deleteAssignment(${a.id})" class="btn btn-red" style="padding:4px 10px;font-size:0.8em;">🗑️ 刪除</button>
+          </td></tr>`;
       }).join('') + '</tbody></table>';
   }
   // 繳交頁面的作業下拉
@@ -607,6 +611,55 @@ async function doCreateClass() {
   if (error) { alert(error.message); return; }
   closeModal();
   await loadClasses();
+}
+
+// ===== 作業編輯 / 刪除 =====
+function editAssignment(aid) {
+  const a = state.assignments.find(x => x.id === aid);
+  if (!a) return;
+  const subjectOptions = state.subjects.map(s => `<option value="${s.id}" ${a.subject_id === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+  showModal('✏️ 編輯作業', `
+    <div style="display:grid;gap:10px;">
+      <select id="editHwSubject"><option value="">選擇科目</option>${subjectOptions}</select>
+      <input id="editHwTitle" value="${a.title}" placeholder="作業名稱">
+      <input id="editHwDueDate" type="date" value="${a.due_date || ''}">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:15px;">
+      <button onclick="doEditAssignment(${aid})" class="btn btn-darkblue" style="flex:1;">💾 儲存變更</button>
+      <button onclick="closeModal()" class="btn btn-gray" style="flex:1;">取消</button>
+    </div>
+  `);
+}
+async function doEditAssignment(aid) {
+  const title = document.getElementById('editHwTitle').value.trim();
+  const subjectId = document.getElementById('editHwSubject').value;
+  const dueDate = document.getElementById('editHwDueDate').value;
+  if (!title) { alert('請填寫作業名稱'); return; }
+  try {
+    const { error } = await sb.from('assignments').update({
+      subject_id: subjectId || null, title, due_date: dueDate || null
+    }).eq('id', aid);
+    if (error) throw error;
+    closeModal();
+    await loadClassData();
+    renderSettings();
+    showToast('作業已更新', 'success');
+  } catch (e) { showToast('更新失敗：' + e.message, 'error'); }
+}
+async function deleteAssignment(aid) {
+  const a = state.assignments.find(x => x.id === aid);
+  if (!a) return;
+  if (!confirm('確定要刪除作業「' + a.title + '」嗎？\n\n⚠️ 注意：此作業的所有繳交紀錄也會一併刪除！')) return;
+  try {
+    // First delete all submissions for this assignment
+    await sb.from('submissions').delete().eq('assignment_id', aid);
+    // Then delete the assignment
+    const { error } = await sb.from('assignments').delete().eq('id', aid);
+    if (error) throw error;
+    await loadClassData();
+    renderSettings();
+    showToast('作業已刪除', 'success');
+  } catch (e) { showToast('刪除失敗：' + e.message, 'error'); }
 }
 
 // ============================================================
