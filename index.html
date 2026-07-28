@@ -556,16 +556,18 @@ async function importStudents() {
 // 設定頁面渲染
 // ============================================================
 function renderSettings() {
-  // 學生列表
+  // 學生列表（只在彈窗開啟時更新）
   const el = document.getElementById('studentList');
-  if (!state.students.length) { el.innerHTML = '<div style="color:#999;text-align:center;width:100%;">尚未匯入學生</div>'; }
-  else {
-    el.innerHTML = state.students.map(s => `
-      <div style="padding:8px;text-align:center;border:1px solid #e0e0e0;border-radius:6px;background:#fafafa;">
-        <div style="font-weight:bold;font-size:1.1em;">${s.student_number}</div>
-        <div style="font-size:0.85em;">${s.name}</div>
-      </div>
-    `).join('');
+  if (el) {
+    if (!state.students.length) { el.innerHTML = '<div style="color:#999;text-align:center;width:100%;">尚未匯入學生</div>'; }
+    else {
+      el.innerHTML = state.students.map(s => `
+        <div style="padding:8px;text-align:center;border:1px solid #e0e0e0;border-radius:6px;background:#fafafa;">
+          <div style="font-weight:bold;font-size:1.1em;">${s.student_number}</div>
+          <div style="font-size:0.85em;">${s.name}</div>
+        </div>
+      `).join('');
+    }
   }
   // 科目列表（只在彈窗開啟時更新）
   const subEl = document.getElementById('subjectList');
