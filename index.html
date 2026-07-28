@@ -101,12 +101,21 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 <!-- ===== 繳交模式 ===== -->
 <div id="tab-submit" class="tab-content active">
   <div class="retro-card p-3 mb-3">
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap mb-2">
       <input id="studentTokenInput" placeholder="掃 QR Code 自動帶入，或手動輸入座號" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm min-w-[200px]">
-      <select id="studentClassSelect" class="retro-input p-2 rounded-lg font-serif text-sm"><option value="">班級</option></select>
+      <select id="studentClassSelect" class="retro-input p-2 rounded-lg font-serif text-sm" onchange="renderSeatGrid()"><option value="">選擇班級</option></select>
       <input id="studentIdInput" type="number" placeholder="座號" class="retro-input w-16 p-2 rounded-lg font-serif text-sm">
       <button onclick="studentManualLogin()" class="btn bg-[#2980b9] text-white px-3 py-2 text-sm rounded font-bold font-serif">進入</button>
     </div>
+    <div class="flex gap-2 items-center">
+      <span class="text-sm font-serif text-retro-ink/60">或</span>
+      <button onclick="toggleSeatView()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" id="seatToggleBtn">📋 顯示座位表</button>
+    </div>
+  </div>
+  <!-- 座位表 -->
+  <div id="seatGridView" class="hidden retro-card p-3 mb-3">
+    <h3 class="font-bold font-serif text-sm mb-2">📋 座位表 - 點選你的座位報到</h3>
+    <div id="seatGrid" class="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"></div>
   </div>
   <div id="studentView" class="hidden">
     <div class="retro-card p-3 mb-3 flex justify-between items-center">
@@ -115,7 +124,12 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
     </div>
     <div id="studentAssignments" class="space-y-2"></div>
   </div>
-  <div id="studentEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif">👆 輸入座號或掃 QR Code 開始繳交</div>
+  <div id="studentEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif">
+    <div class="text-4xl mb-2">📱</div>
+    <div class="font-bold mb-1">掃 QR Code 報到</div>
+    <div class="text-sm mb-2">用手機相機掃描你的 QR Code</div>
+    <div class="text-sm">或選擇班級 → 輸入座號 → 點「進入」</div>
+  </div>
 </div>
 
 <!-- ===== 學生管理 ===== -->
@@ -328,7 +342,7 @@ async function loadClasses() {
   } else {
     showCreateClass();
   }
-  updateStudentClassSelect();
+  await updateStudentClassSelect();
 }
 async function switchClass(id) {
   state.currentClassId = id;
@@ -360,9 +374,16 @@ function renderAllTabs() {
   initCheckView();
   renderDisplay();
 }
-function updateStudentClassSelect() {
+async function updateStudentClassSelect() {
   const sel = document.getElementById('studentClassSelect');
-  sel.innerHTML = '<option value="">班級</option>' + state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  // If no classes loaded yet, fetch all classes publicly
+  if (!state.classes.length) {
+    try {
+      const { data } = await sb.from('classes').select('id, name').order('id');
+      state.classes = data || [];
+    } catch (e) { /* ignore */ }
+  }
+  sel.innerHTML = '<option value="">選擇班級</option>' + state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 }
 
 // ============================================================
@@ -635,12 +656,61 @@ setInterval(() => {
 // ============================================================
 // 學生繳交
 // ============================================================
-function showStudentScan() {
+async function showStudentScan() {
   document.getElementById('studentView').classList.add('hidden');
   document.getElementById('studentEmpty').classList.remove('hidden');
-  updateStudentClassSelect();
+  document.getElementById('seatGridView').classList.add('hidden');
+  await updateStudentClassSelect();
   switchMainTab('submit');
 }
+
+function toggleSeatView() {
+  const el = document.getElementById('seatGridView');
+  if (el.classList.contains('hidden')) {
+    el.classList.remove('hidden');
+    document.getElementById('seatToggleBtn').textContent = '📋 隱藏座位表';
+    renderSeatGrid();
+  } else {
+    el.classList.add('hidden');
+    document.getElementById('seatToggleBtn').textContent = '📋 顯示座位表';
+  }
+}
+
+async function renderSeatGrid() {
+  const classId = document.getElementById('studentClassSelect').value;
+  const grid = document.getElementById('seatGrid');
+  if (!classId) {
+    grid.innerHTML = '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">請先選擇班級</div>';
+    return;
+  }
+  // Load students for this class
+  const { data: students } = await sb.from('students').select('*').eq('class_id', classId).order('student_number');
+  const stuMap = {};
+  (students || []).forEach(s => { stuMap[s.student_number] = s; });
+  // Generate seat grid (1-40)
+  let html = '';
+  for (let i = 1; i <= 40; i++) {
+    const s = stuMap[i];
+    if (s) {
+      html += `<div class="student-card retro-card p-2 text-center cursor-pointer hover:bg-white" onclick="seatLogin(${classId}, ${i})">
+        <div class="font-black text-lg">${i}</div>
+        <div class="text-xs font-serif">${s.name}</div>
+      </div>`;
+    } else {
+      html += `<div class="retro-card p-2 text-center opacity-40">
+        <div class="font-black text-lg text-retro-ink/30">${i}</div>
+        <div class="text-xs font-serif text-retro-ink/30">-</div>
+      </div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+async function seatLogin(classId, seatNum) {
+  document.getElementById('studentIdInput').value = seatNum;
+  await loadStudentView(null, parseInt(classId), seatNum);
+}
+
 async function studentManualLogin() {
   const classId = document.getElementById('studentClassSelect').value;
   const sid = parseInt(document.getElementById('studentIdInput').value);
