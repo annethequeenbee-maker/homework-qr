@@ -262,18 +262,36 @@ let state = {
 // ============================================================
 // API 呼叫
 // ============================================================
+let gasWarmedUp = false;
+
 async function callGAS(action, data = {}) {
   if (!CONFIG.gasUrl || CONFIG.gasUrl === 'YOUR_GAS_WEB_APP_URL_HERE') {
     throw new Error('請先設定 GAS 網址（CONFIG.gasUrl）');
   }
+
+  // 暖機：先 GET 一次建立 session，避免後續 POST 被 302 吃掉
+  if (!gasWarmedUp) {
+    try {
+      await fetch(CONFIG.gasUrl, { method: 'GET', mode: 'no-cors' });
+    } catch (e) { /* ignore */ }
+    gasWarmedUp = true;
+  }
+
   const params = new URLSearchParams({ action, ...data });
   const url = CONFIG.gasUrl + '?' + params.toString();
 
   const res = await fetch(url, { method: 'POST' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const result = await res.json();
-  if (!result.success) throw new Error(result.error || 'API error');
-  return result;
+  const text = await res.text();
+  try {
+    const result = JSON.parse(text);
+    if (!result.success) throw new Error(result.error || 'API error');
+    return result;
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      throw new Error('GAS 回傳非 JSON：' + text.slice(0, 100));
+    }
+    throw e;
+  }
 }
 
 // ============================================================
