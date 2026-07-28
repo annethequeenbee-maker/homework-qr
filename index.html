@@ -138,16 +138,11 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
   <div class="retro-card p-3 mb-3">
     <h3 class="font-bold font-serif mb-1 text-sm">📥 匯入學生名單</h3>
     <p class="text-xs text-retro-ink/60 mb-1 font-serif">每行「座號 姓名」，例如：<code class="bg-gray-100 px-1">1 王小明</code></p>
-    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="可以直接輸入，不用空格：&#10;1王小明&#10;2陳小華&#10;3林小美&#10;（或 1 王小明 也可以）"></textarea>
-    <div id="importPreview" class="hidden mb-2 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs font-serif">
-      <div class="font-bold mb-1">📋 預覽：</div>
-      <div id="previewContent"></div>
-    </div>
+    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="直接輸入座號和姓名：&#10;1王小明&#10;2陳小華&#10;3林小美&#10;4李小明&#10;5張小華"></textarea>
     <div class="flex gap-2 flex-wrap items-center">
-      <button onclick="previewImport()" class="btn bg-[#f1c40f] text-retro-ink px-3 py-1 text-sm rounded font-bold font-serif">👁️ 預覽</button>
-      <button onclick="importStudents()" class="btn bg-[#2980b9] text-white px-3 py-1 text-sm rounded font-bold font-serif">匯入</button>
-      <button onclick="document.getElementById('studentInput').value='';document.getElementById('importPreview').classList.add('hidden');document.getElementById('importResult').textContent='';" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif">清除</button>
-      <button onclick="printQRCodes()" class="btn bg-[#8e44ad] text-white px-3 py-1 text-sm rounded font-bold font-serif">🖨️ QR Code</button>
+      <button onclick="importStudents()" class="btn bg-[#2980b9] text-white px-4 py-2 text-sm rounded font-bold font-serif">匯入學生</button>
+      <button onclick="document.getElementById('studentInput').value='';document.getElementById('importResult').textContent='';" class="btn bg-retro-paper px-3 py-2 text-sm rounded font-serif">清除</button>
+      <button onclick="printQRCodes()" class="btn bg-[#8e44ad] text-white px-3 py-2 text-sm rounded font-bold font-serif">🖨️ 印 QR Code</button>
       <span id="importResult" class="text-sm ml-1 font-serif"></span>
     </div>
   </div>
