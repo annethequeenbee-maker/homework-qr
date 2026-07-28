@@ -135,7 +135,7 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
   <div class="retro-card p-3 mb-3">
     <h3 class="font-bold font-serif mb-1 text-sm">📥 匯入學生名單</h3>
     <p class="text-xs text-retro-ink/60 mb-1 font-serif">每行「座號 姓名」，例如：<code class="bg-gray-100 px-1">1 王小明</code></p>
-    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="直接輸入座號和姓名：&#10;1王小明&#10;2陳小華&#10;3林小美&#10;4李小明&#10;5張小華"></textarea>
+    <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="直接輸入，不用空格也可以：&#10;1王小明&#10;2陳小華&#10;3林小美&#10;4李小明&#10;5張小華"></textarea>
     <div class="flex gap-2 flex-wrap items-center">
       <button onclick="importStudents()" class="btn bg-[#2980b9] text-white px-4 py-2 text-sm rounded font-bold font-serif">匯入學生</button>
       <button onclick="document.getElementById('studentInput').value='';document.getElementById('importResult').textContent='';" class="btn bg-retro-paper px-3 py-2 text-sm rounded font-serif">清除</button>
@@ -330,7 +330,6 @@ async function afterLogin() {
 // 班級管理
 // ============================================================
 async function loadClasses() {
-  // STRICT: Only show classes belonging to this teacher
   const { data, error } = await sb.from('classes').select('*').eq('teacher_name', state.teacherName).order('id');
   if (error) throw error;
   state.classes = data || [];
@@ -339,13 +338,12 @@ async function loadClasses() {
   document.getElementById('classSelector').classList.remove('hidden');
   if (state.classes.length > 0) {
     const lastId = parseInt(localStorage.getItem('last_class_id') || '0');
-    const lastBelongs = state.classes.find(c => c.id === lastId);
-    const target = lastBelongs ? lastId : state.classes[0].id;
+    const target = state.classes.find(c => c.id === lastId) ? lastId : state.classes[0].id;
     await switchClass(target);
   } else {
     showCreateClass();
   }
-  await updateStudentClassSelect();
+  updateStudentClassSelect();
 }
 async function switchClass(id) {
   state.currentClassId = id;
@@ -377,17 +375,10 @@ function renderAllTabs() {
   initCheckView();
   renderDisplay();
 }
-async function updateStudentClassSelect() {
+function updateStudentClassSelect() {
   const sel = document.getElementById('studentClassSelect');
   if (!sel) return;
-  // If no classes loaded yet, fetch all classes publicly
-  if (!state.classes.length) {
-    try {
-      const { data } = await sb.from('classes').select('id, name').order('id');
-      state.classes = data || [];
-    } catch (e) { /* ignore */ }
-  }
-  sel.innerHTML = '<option value="">選擇班級</option>' + state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML = '<option value="">班級</option>' + state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 }
 
 // ============================================================
@@ -405,74 +396,6 @@ function switchMainTab(tab) {
 // ============================================================
 // 學生管理
 // ============================================================
-
-// 智能解析每一行學生資料：支持任何分隔或無分隔
-function parseStudentLine(rawLine) {
-  const line = rawLine.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); // 去除隱藏字符
-  if (!line) return null;
-  
-  // 全角數字轉半角
-  const fullToHalf = { '０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9' };
-  let normalized = '';
-  for (let c of line) { normalized += fullToHalf[c] || c; }
-  
-  // 嘗試1：傳統正則（有空格或分隔符）
-  let m = normalized.match(/^(\d+)[\s\t,，.、]*(.+)$/);
-  if (m) return { student_number: parseInt(m[1]), name: m[2].trim() };
-  
-  // 嘗試2：智能分割（數字後面自動切，不需要分隔符）
-  // 例如 "1王小明" → 1 + 王小明
-  let numStr = '';
-  let nameStr = '';
-  for (let i = 0; i < normalized.length; i++) {
-    const c = normalized[i];
-    if (/\d/.test(c) && nameStr === '') {
-      numStr += c;
-    } else {
-      nameStr += c;
-    }
-  }
-  if (numStr && nameStr.trim()) {
-    return { student_number: parseInt(numStr), name: nameStr.trim() };
-  }
-  
-  return null;
-}
-
-function previewImport() {
-  const input = document.getElementById('studentInput').value;
-  const previewDiv = document.getElementById('importPreview');
-  const contentDiv = document.getElementById('previewContent');
-  if (!input || !input.trim()) { previewDiv.classList.add('hidden'); return; }
-  
-  const lines = input.replace(/\r\n/g, '\n').split('\n');
-  const students = [];
-  const errors = [];
-  
-  lines.forEach((line, idx) => {
-    const result = parseStudentLine(line);
-    if (result) {
-      students.push(result);
-    } else if (line.trim()) {
-      errors.push({ line: idx+1, text: line.trim() });
-    }
-  });
-  
-  let html = '';
-  if (students.length > 0) {
-    html += '<div class="text-green-600 mb-1">✅ 可匯入 ' + students.length + ' 人：</div>';
-    html += '<div class="flex flex-wrap gap-1">' + students.map(s => '<span class="bg-white px-1 rounded border">' + s.student_number + '. ' + s.name + '</span>').join('') + '</div>';
-  }
-  if (errors.length > 0) {
-    html += '<div class="text-red-600 mt-1">❌ 格式錯誤 ' + errors.length + ' 行：</div>';
-    html += errors.map(e => '<div class="text-red-400">第' + e.line + '行「' + e.text + '」</div>').join('');
-    html += '<div class="text-retro-ink/60 mt-1">💡 直接打「1王小明」也可以，數字和姓名不用空格</div>';
-  }
-  
-  contentDiv.innerHTML = html;
-  previewDiv.classList.remove('hidden');
-}
-
 function renderStudents() {
   const el = document.getElementById('studentList');
   if (!state.students.length) {
@@ -486,16 +409,32 @@ function renderStudents() {
     </div>
   `).join('');
 }
+// 智能解析每一行學生資料：支持任何分隔或無分隔
+function parseStudentLine(rawLine) {
+  const line = rawLine.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+  if (!line) return null;
+  const fullToHalf = { '０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9' };
+  let normalized = '';
+  for (let c of line) { normalized += fullToHalf[c] || c; }
+  let m = normalized.match(/^(\d+)[\s\t,，.、]*(.+)$/);
+  if (m) return { student_number: parseInt(m[1]), name: m[2].trim() };
+  let numStr = '', nameStr = '';
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized[i];
+    if (/\d/.test(c) && nameStr === '') { numStr += c; } else { nameStr += c; }
+  }
+  if (numStr && nameStr.trim()) return { student_number: parseInt(numStr), name: nameStr.trim() };
+  return null;
+}
+
 async function importStudents() {
   const input = document.getElementById('studentInput').value;
   const result = document.getElementById('importResult');
   if (!input || !input.trim()) { result.textContent = '❌ 請輸入資料'; return; }
   if (!state.currentClassId) { result.textContent = '❌ 請先建立或選擇班級'; return; }
-  
   const lines = input.replace(/\r\n/g, '\n').split('\n');
   const students = [];
   const errors = [];
-  
   lines.forEach((line, idx) => {
     const parsed = parseStudentLine(line);
     if (parsed) {
@@ -504,19 +443,15 @@ async function importStudents() {
       errors.push('第' + (idx+1) + '行「' + line.trim() + '」');
     }
   });
-  
-  if (students.length === 0) { 
-    result.innerHTML = '❌ 格式錯誤<br><span class="text-xs text-retro-ink/60">直接輸入「1王小明」或「1 王小明」都可以</span>'; 
-    return; 
+  if (students.length === 0) {
+    result.innerHTML = '❌ 格式錯誤<br><span class="text-xs text-retro-ink/60">直接輸入「1王小明」或「1 王小明」都可以</span>';
+    return;
   }
-  
   try {
     const { data, error } = await sb.from('students').upsert(students, { onConflict: 'class_id,student_number' }).select();
     if (error) throw error;
     let msg = '✅ 匯入 ' + (data ? data.length : students.length) + ' 人';
-    if (errors.length > 0) {
-      msg += '<br><span class="text-xs text-orange-600">⚠️ ' + errors.length + ' 行未匯入</span>';
-    }
+    if (errors.length > 0) msg += '<br><span class="text-xs text-orange-600">⚠️ ' + errors.length + ' 行未匯入</span>';
     result.innerHTML = msg;
     document.getElementById('studentInput').value = '';
     await loadClassData();
@@ -747,12 +682,9 @@ setInterval(() => {
 // ============================================================
 function parseScanInput(input) {
   input = input.trim();
-  // Try to extract token from URL like ...#/student/TOKEN
   const urlMatch = input.match(/#\/student\/(\w+)/);
   if (urlMatch) return { type: 'token', token: urlMatch[1] };
-  // Try direct token (alphanumeric string)
   if (/^[a-zA-Z0-9_-]+$/.test(input) && input.length >= 4) return { type: 'token', token: input };
-  // Try "className seatNumber" format
   const parts = input.split(/\s+/);
   if (parts.length >= 2) {
     const last = parts[parts.length - 1];
@@ -768,19 +700,15 @@ function parseScanInput(input) {
 async function teacherScanStudent() {
   const input = document.getElementById('scanTokenInput').value;
   if (!input) { alert('請輸入或掃描學生 QR Code'); return; }
-  
   const parsed = parseScanInput(input);
   let student = null;
   let classData = null;
-  
   try {
     if (parsed.type === 'token') {
-      // Find by qr_token
       const { data } = await sb.from('students').select('*, classes(name, teacher_name)').eq('qr_token', parsed.token).single();
       student = data;
       if (student) classData = student.classes;
     } else if (parsed.type === 'classSeat') {
-      // Find by class name + seat number
       const { data: cls } = await sb.from('classes').select('*').eq('name', parsed.className).eq('teacher_name', state.teacherName).single();
       if (!cls) throw new Error('找不到班級「' + parsed.className + '」');
       classData = cls;
@@ -789,12 +717,8 @@ async function teacherScanStudent() {
     } else {
       throw new Error('無法辨識輸入格式');
     }
-    
     if (!student) throw new Error('找不到此學生');
-    if (classData && classData.teacher_name !== state.teacherName) {
-      throw new Error('此學生不屬於您的班級');
-    }
-    
+    if (classData && classData.teacher_name !== state.teacherName) throw new Error('此學生不屬於您的班級');
     state.currentScanStudent = student;
     state.currentScanClassId = student.class_id;
     await renderScanResult(student);
@@ -806,43 +730,29 @@ async function teacherScanStudent() {
 }
 
 async function renderScanResult(student) {
-  // Get class name
   const { data: cls } = await sb.from('classes').select('name').eq('id', student.class_id).single();
   const className = cls ? cls.name : '';
-  
   document.getElementById('scanStudentName').textContent = student.name || ('座號 ' + student.student_number);
-  document.getElementById('scanStudentInfo').textContent = `${className} 座號${student.student_number}`;
+  document.getElementById('scanStudentInfo').textContent = className + ' 座號' + student.student_number;
   document.getElementById('scanResultView').classList.remove('hidden');
   document.getElementById('scanEmpty').classList.add('hidden');
-  
-  // Get assignments and submissions
   const { data: assignments } = await sb.from('assignments').select('*, subjects(name)').eq('class_id', student.class_id);
   const { data: submissions } = await sb.from('submissions').select('*').eq('student_id', student.id);
   const subs = submissions || [];
   const today = todayStr();
-  
   const list = (assignments || []).map(a => {
     const sub = subs.find(x => x.assignment_id === a.id);
     const isPastDue = a.due_date && a.due_date < today;
-    let status = 'pending';
-    let submittedAt = null;
-    let note = '';
-    if (sub) {
-      submittedAt = sub.submitted_at;
-      note = sub.note || '';
-      status = sub.status;
-    } else if (isPastDue) {
-      status = 'missing';
-    }
+    let status = 'pending', submittedAt = null, note = '';
+    if (sub) { submittedAt = sub.submitted_at; note = sub.note || ''; status = sub.status; }
+    else if (isPastDue) { status = 'missing'; }
     return { assignmentId: a.id, subjectName: a.subjects ? a.subjects.name : '', title: a.title, dueDate: a.due_date, status, submittedAt, note };
   });
-  
   const el = document.getElementById('scanAssignments');
   if (!list.length) {
     el.innerHTML = '<div class="retro-card p-4 text-center text-retro-ink/50 font-serif text-sm">目前沒有作業</div>';
     return;
   }
-  
   el.innerHTML = list.map(a => `
     <div class="student-card retro-card p-3 ${statusClass(a.status)}">
       <div class="flex justify-between items-start">
