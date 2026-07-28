@@ -146,8 +146,11 @@ tr:hover { background: #f9f9f9; }
 <header class="header no-print">
   <h1>📋 作業繳交系統</h1>
   <div class="header-bar">
-    <span>班級：</span>
-    <select id="classSelect" onchange="onClassChange(parseInt(this.value))"><option value="">-- 選擇班級 --</option></select>
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);padding:6px 15px;border-radius:8px;">
+      <span style="font-size:0.85em;opacity:0.8;">目前班級</span>
+      <span id="currentClassDisplay" style="font-weight:bold;font-size:1.1em;">--</span>
+    </div>
+    <select id="classSelect" onchange="onClassChange(parseInt(this.value))"><option value="">-- 切換班級 --</option></select>
     <button onclick="showCreateClassModal()" class="btn-primary">＋ 新班級</button>
     <span id="teacherDisplay" style="font-weight:bold;"></span>
     <button onclick="switchTeacher()" class="btn-secondary">👤 切換</button>
@@ -159,7 +162,7 @@ tr:hover { background: #f9f9f9; }
 <nav class="tab-nav no-print" id="mainTabs">
   <button class="tab-btn active" data-tab="submit" onclick="switchTab('submit')">📋 繳交</button>
   <button class="tab-btn" data-tab="correction" onclick="switchTab('correction')">📝 訂正</button>
-  <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ 設定</button>
+  <button class="tab-btn" onclick="openSettingsModal()">⚙️ 設定</button>
   <button class="tab-btn" data-tab="report" onclick="switchTab('report')">📊 報表</button>
 </nav>
 
@@ -178,12 +181,12 @@ tr:hover { background: #f9f9f9; }
 
 <!-- 📋 繳交頁面 -->
 <div id="tab-submit" class="tab-panel active">
+  <!-- 作業 A -->
   <div class="container">
-    <div class="section-title">📋 作業繳交</div>
+    <div class="section-title">📋 作業繳交 A</div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
       <label>選擇作業：</label>
-      <select id="submitAssignmentSelect" style="min-width: 200px;"><option value="">-- 請選擇作業 --</option></select>
-      <button onclick="loadSubmitView()" class="btn btn-darkblue" style="padding: 8px 20px;">載入全班</button>
+      <select id="submitAssignmentSelectA" onchange="loadSubmitViewA()" style="min-width: 200px;"><option value="">-- 請選擇作業 --</option></select>
       <button onclick="toggleBatchMode()" class="btn btn-gray" id="batchModeBtn" style="padding: 8px 15px;">☐ 批量模式</button>
     </div>
     <div class="legend">
@@ -197,20 +200,46 @@ tr:hover { background: #f9f9f9; }
     <div id="batchHint" class="hidden" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em;">
       📌 批量模式：勾選要標記的學生，然後用下方按鈕批量操作
     </div>
-    <div id="submitStudentGrid" class="student-grid"></div>
-    <div id="submitEmpty" class="hidden" style="text-align: center; color: #999; padding: 40px;">
+    <div id="submitStudentGridA" class="student-grid"></div>
+    <div id="submitEmptyA" class="hidden" style="text-align: center; color: #999; padding: 40px;">
       <div style="font-size: 2em; margin-bottom: 10px;">👆</div>
-      <div>請先選擇作業並點「載入全班」</div>
+      <div>請選擇作業</div>
     </div>
-    <!-- 批量操作浮動欄 -->
-    <div id="batchBar" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
-      <span style="align-self: center; font-weight: bold;">已選 <span id="batchCount">0</span> 人</span>
-      <button onclick="batchMark('submitted')" class="btn btn-green" style="padding: 8px 20px;">✅ 批量已繳</button>
-      <button onclick="batchMark('missing')" class="btn btn-red" style="padding: 8px 20px;">❌ 批量缺交</button>
-      <button onclick="batchMark('pending')" class="btn btn-gray" style="padding: 8px 20px;">○ 批量未繳</button>
-      <button onclick="clearBatchSelection()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">清除選擇</button>
-      <button onclick="toggleBatchMode()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">退出批量</button>
+  </div>
+
+  <!-- 分隔線 -->
+  <div style="border-top: 3px dashed #1d4e89; margin: 20px 0;"></div>
+
+  <!-- 作業 B -->
+  <div class="container">
+    <div class="section-title">📋 作業繳交 B</div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+      <label>選擇作業：</label>
+      <select id="submitAssignmentSelectB" onchange="loadSubmitViewB()" style="min-width: 200px;"><option value="">-- 請選擇作業 --</option></select>
     </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-box status-pending"></div> 未繳交</div>
+      <div class="legend-item"><div class="legend-box status-submitted"></div> 已繳交</div>
+      <div class="legend-item"><div class="legend-box status-missing"></div> 缺交</div>
+      <div class="legend-item"><div class="legend-box status-needs_correction"></div> 待訂正</div>
+      <div class="legend-item"><div class="legend-box status-corrected"></div> 已訂正</div>
+      <div class="legend-item"><div class="legend-box status-late"></div> 遲交</div>
+    </div>
+    <div id="submitStudentGridB" class="student-grid"></div>
+    <div id="submitEmptyB" class="hidden" style="text-align: center; color: #999; padding: 40px;">
+      <div style="font-size: 2em; margin-bottom: 10px;">👆</div>
+      <div>請選擇作業</div>
+    </div>
+  </div>
+
+  <!-- 批量操作浮動欄 -->
+  <div id="batchBar" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+    <span style="align-self: center; font-weight: bold;">已選 <span id="batchCount">0</span> 人</span>
+    <button onclick="batchMark('submitted')" class="btn btn-green" style="padding: 8px 20px;">✅ 批量已繳</button>
+    <button onclick="batchMark('missing')" class="btn btn-red" style="padding: 8px 20px;">❌ 批量缺交</button>
+    <button onclick="batchMark('pending')" class="btn btn-gray" style="padding: 8px 20px;">○ 批量未繳</button>
+    <button onclick="clearBatchSelection()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">清除選擇</button>
+    <button onclick="toggleBatchMode()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">退出批量</button>
   </div>
 </div>
 
@@ -263,47 +292,8 @@ tr:hover { background: #f9f9f9; }
   </div>
 </div>
 
-<!-- ⚙️ 設定頁面 -->
-<div id="tab-settings" class="tab-panel">
-  <!-- 學生管理 -->
-  <div class="container">
-    <div class="section-title">👥 學生管理</div>
-    <div class="subsection-title">📥 匯入學生名單</div>
-    <p style="font-size: 0.9em; color: #666; margin-bottom: 8px;">每行輸入座號和姓名，不用空格也可以：</p>
-    <textarea id="studentInput" rows="6" placeholder="1王小明&#10;2陳小華&#10;3林小美&#10;4李小明&#10;5張小華"></textarea>
-    <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
-      <button onclick="importStudents()" class="btn btn-blue">匯入學生</button>
-      <button onclick="document.getElementById('studentInput').value='';document.getElementById('importResult').textContent='';" class="btn btn-gray">清除</button>
-      <span id="importResult" style="align-self: center; color: #666;"></span>
-    </div>
-    <div class="subsection-title">📋 學生名單</div>
-    <div id="studentList" class="student-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));"></div>
-  </div>
-
-  <!-- 科目管理 -->
-  <div class="container">
-    <div class="section-title">📚 科目管理</div>
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-      <input id="subjectInput" placeholder="輸入科目名稱（如：國語、數學）" style="flex: 1;">
-      <button onclick="createSubject()" class="btn btn-green">新增科目</button>
-    </div>
-    <div id="subjectList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-  </div>
-
-  <!-- 作業管理 -->
-  <div class="container">
-    <div class="section-title">📝 作業管理</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-      <select id="hwSubject"><option value="">選擇科目</option></select>
-      <input id="hwTitle" placeholder="作業名稱">
-      <input id="hwDueDate" type="date">
-    </div>
-    <div style="margin-bottom: 15px;">
-      <button onclick="createAssignment()" class="btn btn-darkblue">＋ 建立新作業</button>
-    </div>
-    <div id="assignmentList"></div>
-  </div>
-</div>
+<!-- ⚙️ 設定頁面（佔位用，實際內容在彈窗中） -->
+<div id="tab-settings" class="tab-panel"></div>
 
 <!-- 📊 報表頁面 -->
 <div id="tab-report" class="tab-panel">
@@ -470,6 +460,11 @@ async function onClassChange(id) {
   localStorage.setItem('last_class_id', id);
   await loadClassData();
   renderAll();
+  const cls = state.classes.find(c => c.id === id);
+  if (cls) {
+    document.getElementById('currentClassDisplay').textContent = cls.name;
+    showToast('已切換到「' + cls.name + '」', 'info');
+  }
 }
 async function loadClassData() {
   const cid = state.currentClassId;
@@ -493,11 +488,11 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelectorAll('#mainTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   if (tab === 'submit') {
-    // Auto-reload if assignment was previously selected
-    if (state.currentAssignmentId) {
-      document.getElementById('submitAssignmentSelect').value = state.currentAssignmentId;
-      loadSubmitView();
-    }
+    // Auto-reload both assignments if previously selected
+    const aidA = document.getElementById('submitAssignmentSelectA').value;
+    if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    const aidB = document.getElementById('submitAssignmentSelectB').value;
+    if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
   }
   if (tab === 'correction') renderCorrection();
   if (tab === 'report') renderReport();
@@ -572,35 +567,56 @@ function renderSettings() {
       </div>
     `).join('');
   }
-  // 科目列表
+  // 科目列表（只在彈窗開啟時更新）
   const subEl = document.getElementById('subjectList');
-  if (!state.subjects.length) { subEl.innerHTML = '<span style="color:#999;">尚無科目</span>'; }
-  else {
-    subEl.innerHTML = state.subjects.map(s => `<span style="display:inline-block;padding:5px 12px;background:#e3f2fd;color:#1565c0;border-radius:15px;font-size:0.9em;">${s.name}</span>`).join('');
+  if (subEl) {
+    if (!state.subjects.length) { subEl.innerHTML = '<span style="color:#999;">尚無科目</span>'; }
+    else {
+      subEl.innerHTML = state.subjects.map(s => `<span style="display:inline-block;padding:5px 12px;background:#e3f2fd;color:#1565c0;border-radius:15px;font-size:0.9em;">${s.name}</span>`).join('');
+    }
   }
-  // 科目選擇下拉
+  // 科目選擇下拉（只在彈窗開啟時更新）
   const hwSub = document.getElementById('hwSubject');
-  hwSub.innerHTML = '<option value="">選擇科目</option>' + state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  // 作業列表
+  if (hwSub) hwSub.innerHTML = '<option value="">選擇科目</option>' + state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  // 作業列表（只在彈窗開啟時更新）
   const asEl = document.getElementById('assignmentList');
-  if (!state.assignments.length) { asEl.innerHTML = '<div style="color:#999;">尚無作業</div>'; }
-  else {
-    asEl.innerHTML = '<table><thead><tr><th>科目</th><th>作業名稱</th><th>截止日</th><th>操作</th></tr></thead><tbody>' +
-      state.assignments.map(a => {
-        const subName = a.subjects ? a.subjects.name : '';
-        return `<tr><td>${subName || '-'}</td><td>${a.title}</td><td>${a.due_date || '無'}</td>
-          <td>
-            <button onclick="editAssignment(${a.id})" class="btn btn-blue" style="padding:4px 10px;font-size:0.8em;">✏️ 編輯</button>
-            <button onclick="deleteAssignment(${a.id})" class="btn btn-red" style="padding:4px 10px;font-size:0.8em;">🗑️ 刪除</button>
-          </td></tr>`;
-      }).join('') + '</tbody></table>';
+  if (asEl) {
+    if (!state.assignments.length) { asEl.innerHTML = '<div style="color:#999;">尚無作業</div>'; }
+    else {
+      asEl.innerHTML = '<table style="font-size:0.85em;"><thead><tr><th>科目</th><th>作業名稱</th><th>截止日</th><th>操作</th></tr></thead><tbody>' +
+        state.assignments.map(a => {
+          const subName = a.subjects ? a.subjects.name : '';
+          return `<tr><td>${subName || '-'}</td><td>${a.title}</td><td>${a.due_date || '無'}</td>
+            <td>
+              <button onclick="editAssignment(${a.id})" class="btn btn-blue" style="padding:3px 8px;font-size:0.75em;">✏️</button>
+              <button onclick="deleteAssignment(${a.id})" class="btn btn-red" style="padding:3px 8px;font-size:0.75em;">🗑️</button>
+            </td></tr>`;
+        }).join('') + '</tbody></table>';
+    }
   }
-  // 繳交頁面的作業下拉
-  const sa = document.getElementById('submitAssignmentSelect');
-  sa.innerHTML = '<option value="">-- 請選擇作業 --</option>' + state.assignments.map(a => {
+  // 學生列表（只在彈窗開啟時更新）
+  const stuEl = document.getElementById('studentList');
+  if (stuEl) {
+    if (!state.students.length) { stuEl.innerHTML = '<div style="color:#999;text-align:center;">尚未匯入學生</div>'; }
+    else {
+      stuEl.innerHTML = state.students.map(s => `
+        <div style="padding:5px 8px;text-align:center;border:1px solid #e0e0e0;border-radius:6px;background:#fafafa;font-size:0.85em;">
+          <div style="font-weight:bold;">${s.student_number}</div>
+          <div>${s.name}</div>
+        </div>
+      `).join('');
+    }
+  }
+  // 繳交頁面的作業下拉 A 和 B
+  const opts = '<option value="">-- 請選擇作業 --</option>' + state.assignments.map(a => {
     const subName = a.subjects ? a.subjects.name : '';
     return `<option value="${a.id}">${subName ? '['+subName+'] ' : ''}${a.title}（截止：${a.due_date || '無'}）</option>`;
   }).join('');
+  document.getElementById('submitAssignmentSelectA').innerHTML = opts;
+  document.getElementById('submitAssignmentSelectB').innerHTML = opts;
+  // 更新 Header 目前班級顯示
+  const cls = state.classes.find(c => c.id === state.currentClassId);
+  document.getElementById('currentClassDisplay').textContent = cls ? cls.name : '--';
 }
 
 // ============================================================
@@ -692,20 +708,27 @@ async function deleteAssignment(aid) {
 // ============================================================
 // 繳交頁面
 // ============================================================
-async function loadSubmitView() {
-  const aid = parseInt(document.getElementById('submitAssignmentSelect').value);
-  if (!aid) { alert('請先選擇作業'); return; }
-  if (!state.students.length) { alert('此班級尚無學生'); return; }
+async function loadSubmitViewA() {
+  const aid = parseInt(document.getElementById('submitAssignmentSelectA').value);
+  if (!aid) return;
   state.currentAssignmentId = aid;
-  // Load submissions for this assignment
+  await renderSubmitGrid(aid, 'submitStudentGridA', 'submitEmptyA');
+}
+async function loadSubmitViewB() {
+  const aid = parseInt(document.getElementById('submitAssignmentSelectB').value);
+  if (!aid) return;
+  await renderSubmitGrid(aid, 'submitStudentGridB', 'submitEmptyB');
+}
+async function renderSubmitGrid(aid, gridId, emptyId) {
+  if (!state.students.length) return;
   const { data: subs } = await sb.from('submissions').select('*').eq('assignment_id', aid);
   const subsMap = {};
   (subs || []).forEach(s => { subsMap[s.student_id] = s; });
   const today = todayStr();
   const assignment = state.assignments.find(a => a.id === aid);
   const isPastDue = assignment && assignment.due_date && assignment.due_date < today;
-  const grid = document.getElementById('submitStudentGrid');
-  document.getElementById('submitEmpty').classList.add('hidden');
+  const grid = document.getElementById(gridId);
+  document.getElementById(emptyId).classList.add('hidden');
   grid.innerHTML = state.students.map(s => {
     const sub = subsMap[s.id];
     let status = 'pending';
@@ -728,8 +751,13 @@ function toggleBatchMode() {
   state.batchMode = !state.batchMode;
   state.batchSelected.clear();
   updateBatchUI();
-  // Reload grid to show/hide checkboxes
-  if (state.currentAssignmentId) loadSubmitView();
+  // Reload grids to show/hide checkboxes
+  if (state.currentAssignmentId) {
+    const aidA = document.getElementById('submitAssignmentSelectA').value;
+    if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    const aidB = document.getElementById('submitAssignmentSelectB').value;
+    if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+  }
 }
 
 function toggleBatchItem(sid) {
@@ -1157,6 +1185,63 @@ function showModal(title, body) {
   document.getElementById('modalOverlay').classList.add('active');
 }
 function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+function openSettingsModal() {
+  renderSettings();
+  showModal('⚙️ 設定', `
+    <div style="max-height:70vh;overflow-y:auto;padding-right:10px;">
+      <!-- 字體選擇 -->
+      <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">🎨 字體設定</div>
+        <select id="fontSelector" onchange="changeFont(this.value)" style="width:100%;">
+          <option value="'Microsoft JhengHei', Arial, sans-serif">微軟正黑體（預設）</option>
+          <option value="'Noto Sans TC', sans-serif">Noto Sans TC</option>
+          <option value="'Noto Serif TC', serif">思源宋體</option>
+          <option value="'Heiti TC', 'Heiti SC', sans-serif">黑體</option>
+          <option value="'STHeiti', sans-serif">圓體</option>
+          <option value="'Arial', sans-serif">Arial</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+        </select>
+      </div>
+      <!-- 學生管理 -->
+      <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">👥 學生管理</div>
+        <p style="font-size:0.9em;color:#666;margin-bottom:8px;">每行輸入座號和姓名，不用空格也可以：</p>
+        <textarea id="studentInput" rows="5" placeholder="1王小明&#10;2陳小華&#10;3林小美" style="width:100%;margin-bottom:8px;"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button onclick="importStudents()" class="btn btn-blue" style="padding:6px 15px;font-size:0.85em;">匯入學生</button>
+          <button onclick="document.getElementById('studentInput').value='';document.getElementById('importResult').textContent='';" class="btn btn-gray" style="padding:6px 15px;font-size:0.85em;">清除</button>
+          <span id="importResult" style="align-self:center;color:#666;font-size:0.85em;"></span>
+        </div>
+        <div id="studentList" style="margin-top:10px;max-height:150px;overflow-y:auto;"></div>
+      </div>
+      <!-- 科目管理 -->
+      <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">📚 科目管理</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input id="subjectInput" placeholder="科目名稱（如：國語、數學）" style="flex:1;">
+          <button onclick="createSubject()" class="btn btn-green" style="padding:6px 15px;font-size:0.85em;">新增</button>
+        </div>
+        <div id="subjectList"></div>
+      </div>
+      <!-- 作業管理 -->
+      <div>
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">📝 作業管理</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <select id="hwSubject"><option value="">選擇科目</option></select>
+          <input id="hwTitle" placeholder="作業名稱">
+          <input id="hwDueDate" type="date" placeholder="截止日">
+        </div>
+        <button onclick="createAssignment()" class="btn btn-darkblue" style="padding:6px 15px;font-size:0.85em;">＋ 建立新作業</button>
+        <div id="assignmentList" style="margin-top:10px;max-height:200px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  `);
+}
+function changeFont(fontFamily) {
+  document.body.style.fontFamily = fontFamily;
+  localStorage.setItem('app_font', fontFamily);
+  showToast('字體已變更', 'success');
+}
 function showGASTutorial() {
   showModal('☁️ Google Apps Script 設定教學', `
     <div style="font-size:0.95em;line-height:1.6;">
