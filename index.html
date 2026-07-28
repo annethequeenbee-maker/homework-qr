@@ -7,6 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 tailwind.config = {
   theme: {
@@ -48,46 +50,48 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 .wood-bar { background: #f7f1e3; border: 2px solid #5d4037; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
 .tool-btn { background: #fffbf0; border: 2px solid #5d4037; box-shadow: 2px 2px 0px 0px rgba(0,0,0,1); }
 .tool-btn:active { box-shadow: none; transform: translate(2px, 2px); }
-/* 復古捲軸 */
 .retro-scrollbar::-webkit-scrollbar { width: 12px; height: 12px; }
 .retro-scrollbar::-webkit-scrollbar-track { background: #e0d0b0; border-left: 2px solid #2c2c2c; }
 .retro-scrollbar::-webkit-scrollbar-thumb { background: #2c2c2c; border: 2px solid #e0d0b0; }
+.slider-thumb { -webkit-appearance: none; appearance: none; height: 6px; background: #bdc3c7; border-radius: 3px; outline: none; }
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #c0392b; border: 2px solid #2c2c2c; border-radius: 50%; cursor: pointer; }
 </style>
 </head>
 <body>
 
-<!-- 裝飾暗角 -->
 <div class="fixed inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(44,44,44,0.15)] z-10"></div>
 
-<!-- ===== 頂部導航列（參考 routines.html 風格） ===== -->
-<div class="no-print wood-bar rounded-[1.5rem] px-4 py-3 mx-4 mt-4 mb-2 flex justify-between items-center z-20 sticky top-0">
-  <div class="flex items-center gap-4">
+<div class="no-print wood-bar rounded-[1.5rem] px-4 py-3 mx-4 mt-4 mb-2 flex justify-between items-center z-20 sticky top-0 flex-wrap gap-2">
+  <div class="flex items-center gap-4 flex-wrap">
     <div class="flex items-center gap-3">
-      <div class="p-1 border-2 border-[#5d4037] bg-[#fcfbf9] flex items-center justify-center rounded-lg">
-        <span class="text-xl">📋</span>
-      </div>
-      <span class="text-2xl font-black font-serif text-retro-ink tracking-widest hidden md:inline">作業繳交系統</span>
+      <div class="p-1 border-2 border-[#5d4037] bg-[#fcfbf9] flex items-center justify-center rounded-lg"><span class="text-xl">📋</span></div>
+      <span id="appTitle" class="text-2xl font-black font-serif text-retro-ink tracking-widest hidden md:inline">作業繳交系統</span>
     </div>
     <div class="flex gap-1 overflow-x-auto retro-scrollbar" id="mainTabs">
-      <div class="nav-tab active" data-tab="submit" onclick="switchMainTab('submit')">🎒 繳交</div>
-      <div class="nav-tab" data-tab="students" onclick="switchMainTab('students')">👥 學生</div>
-      <div class="nav-tab" data-tab="subjects" onclick="switchMainTab('subjects')">📚 科目</div>
-      <div class="nav-tab" data-tab="assignments" onclick="switchMainTab('assignments')">📝 作業</div>
-      <div class="nav-tab" data-tab="check" onclick="switchMainTab('check')">✅ 檢查</div>
-      <div class="nav-tab" data-tab="display" onclick="switchMainTab('display')">📺 一覽</div>
-      <div class="nav-tab" data-tab="export" onclick="switchMainTab('export')">📊 報表</div>
+      <div class="nav-tab active" data-tab="submit" onclick="switchMainTab('submit')">🎒 <span data-i18n="tab_submit">繳交</span></div>
+      <div class="nav-tab" data-tab="students" onclick="switchMainTab('students')">👥 <span data-i18n="tab_students">學生</span></div>
+      <div class="nav-tab" data-tab="subjects" onclick="switchMainTab('subjects')">📚 <span data-i18n="tab_subjects">科目</span></div>
+      <div class="nav-tab" data-tab="assignments" onclick="switchMainTab('assignments')">📝 <span data-i18n="tab_assignments">作業</span></div>
+      <div class="nav-tab" data-tab="check" onclick="switchMainTab('check')">✅ <span data-i18n="tab_check">檢查</span></div>
+      <div class="nav-tab" data-tab="stats" onclick="switchMainTab('stats')">📈 <span data-i18n="tab_stats">統計</span></div>
+      <div class="nav-tab" data-tab="display" onclick="switchMainTab('display')">📺 <span data-i18n="tab_display">一覽</span></div>
+      <div class="nav-tab" data-tab="export" onclick="switchMainTab('export')">📊 <span data-i18n="tab_export">報表</span></div>
     </div>
   </div>
-  <div class="flex items-center gap-2 shrink-0">
+  <div class="flex items-center gap-2 shrink-0 flex-wrap">
+    <button onclick="toggleLang()" class="tool-btn px-2 py-1 text-sm rounded font-serif" title="切換語言">🌐 <span id="langLabel">中文</span></button>
+    <button onclick="openSettings()" class="tool-btn px-2 py-1 text-sm rounded font-serif" title="設定">⚙️</button>
+    <div id="roleDisplay" class="hidden text-xs font-bold font-serif px-2 py-1 bg-yellow-200 border-2 border-retro-ink rounded"></div>
     <div id="loginArea" class="flex gap-1 items-center">
       <input id="teacherNameInput" type="text" placeholder="老師姓名" class="retro-input text-sm p-1 rounded w-24 font-serif" onkeydown="if(event.key==='Enter')teacherLogin()">
-      <button onclick="teacherLogin()" class="btn bg-[#c0392b] text-white px-3 py-1 text-sm rounded font-bold font-serif">登入</button>
+      <button onclick="teacherLogin()" class="btn bg-[#c0392b] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_login">登入</button>
     </div>
-    <div id="teacherArea" class="hidden items-center gap-1">
+    <div id="teacherArea" class="hidden items-center gap-1 flex-wrap">
       <span id="teacherNameDisplay" class="text-sm font-bold font-serif px-2"></span>
       <div id="classSelector" class="hidden">
         <select id="classSelectNav" onchange="switchClass(parseInt(this.value))" class="retro-input text-sm p-1 rounded font-serif"></select>
       </div>
+      <button onclick="showArchiveModal()" class="tool-btn px-2 py-1 text-xs rounded font-serif" title="封存">📦</button>
       <button onclick="showSwitchTeacher()" class="tool-btn px-2 py-1 text-xs rounded font-serif" title="切換老師">👤</button>
       <button onclick="teacherLogout()" class="tool-btn px-2 py-1 text-xs rounded font-serif" title="登出">×</button>
     </div>
@@ -96,36 +100,55 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 
 <main class="max-w-6xl mx-auto p-3">
 
-<!-- ===== 繳交模式 ===== -->
 <div id="tab-submit" class="tab-content active">
   <div class="retro-card p-3 mb-3">
     <div class="flex items-center gap-2 flex-wrap">
       <input id="studentTokenInput" placeholder="掃 QR Code 自動帶入，或手動輸入座號" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm min-w-[200px]">
-      <select id="studentClassSelect" class="retro-input p-2 rounded-lg font-serif text-sm"><option value="">班級</option></select>
+      <select id="studentClassSelect" class="retro-input p-2 rounded-lg font-serif text-sm"><option value="" data-i18n="opt_class">班級</option></select>
       <input id="studentIdInput" type="number" placeholder="座號" class="retro-input w-16 p-2 rounded-lg font-serif text-sm">
-      <button onclick="studentManualLogin()" class="btn bg-[#2980b9] text-white px-3 py-2 text-sm rounded font-bold font-serif">進入</button>
+      <button onclick="studentManualLogin()" class="btn bg-[#2980b9] text-white px-3 py-2 text-sm rounded font-bold font-serif" data-i18n="btn_enter">進入</button>
+    </div>
+    <div class="mt-2 flex items-center gap-2 text-xs font-serif text-retro-ink/60">
+      <span data-i18n="qr_mode_label">QR 模式：</span>
+      <select id="qrModeSelect" onchange="changeQRMode(this.value)" class="retro-input p-1 rounded text-xs">
+        <option value="student" data-i18n="qr_mode_student">學生 QR（一人一碼）</option>
+        <option value="assignment" data-i18n="qr_mode_assignment">作業 QR（一作業一碼）</option>
+        <option value="manual" data-i18n="qr_mode_manual">手動點名</option>
+      </select>
     </div>
   </div>
   <div id="studentView" class="hidden">
     <div class="retro-card p-3 mb-3 flex justify-between items-center">
       <div><span id="studentName" class="text-xl font-black font-serif"></span> <span id="studentClass" class="text-sm text-retro-ink/60 font-serif"></span></div>
-      <button onclick="showStudentScan()" class="tool-btn px-3 py-1 text-sm rounded font-serif">換學生</button>
+      <button onclick="showStudentScan()" class="tool-btn px-3 py-1 text-sm rounded font-serif" data-i18n="btn_switch_student">換學生</button>
     </div>
     <div id="studentAssignments" class="space-y-2"></div>
   </div>
-  <div id="studentEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif">👆 輸入座號或掃 QR Code 開始繳交</div>
+  <div id="studentEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif" data-i18n="msg_enter_or_scan">👆 輸入座號或掃 QR Code 開始繳交</div>
 </div>
 
-<!-- ===== 學生管理 ===== -->
 <div id="tab-students" class="tab-content">
   <div class="retro-card p-3 mb-3">
-    <h3 class="font-bold font-serif mb-1 text-sm">📥 匯入學生名單</h3>
-    <p class="text-xs text-retro-ink/60 mb-1 font-serif">每行「座號 姓名」，例如：<code class="bg-gray-100 px-1">1 王小明</code></p>
+    <h3 class="font-bold font-serif mb-1 text-sm">📥 <span data-i18n="import_students">匯入學生名單</span></h3>
+    <p class="text-xs text-retro-ink/60 mb-1 font-serif" data-i18n="import_format_hint">每行「座號 姓名」，例如：<code class="bg-gray-100 px-1">1 王小明</code></p>
     <textarea id="studentInput" rows="6" class="retro-input w-full p-2 rounded-lg font-mono text-sm mb-2" placeholder="1 王小明&#10;2 陳小華&#10;3 林小美&#10;4 李小明&#10;5 張小華"></textarea>
-    <div class="flex gap-2">
-      <button onclick="importStudents()" class="btn bg-[#2980b9] text-white px-3 py-1 text-sm rounded font-bold font-serif">匯入</button>
+    <div class="flex gap-2 flex-wrap items-center mb-2">
+      <button onclick="importStudents()" class="btn bg-[#2980b9] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_import">匯入</button>
       <button onclick="printQRCodes()" class="btn bg-[#8e44ad] text-white px-3 py-1 text-sm rounded font-bold font-serif">🖨️ QR Code</button>
       <span id="importResult" class="text-sm ml-1 font-serif self-center"></span>
+    </div>
+    <hr class="border-retro-ink/20 my-2">
+    <div class="flex gap-2 flex-wrap items-center">
+      <label class="text-xs font-serif font-bold" data-i18n="excel_import_label">📁 Excel / CSV 匯入：</label>
+      <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" onchange="handleExcelFile(this)" class="text-xs font-serif">
+    </div>
+    <div id="excelPreview" class="hidden mt-2">
+      <p class="text-xs font-bold font-serif mb-1" data-i18n="preview_rows">預覽列數：</p>
+      <div id="excelPreviewContent" class="max-h-40 overflow-y-auto retro-scrollbar border-2 border-retro-ink bg-white p-2 text-xs font-mono"></div>
+      <div class="flex gap-2 mt-2">
+        <button onclick="confirmExcelImport()" class="btn bg-[#27ae60] text-white px-3 py-1 text-xs rounded font-bold font-serif" data-i18n="btn_confirm_import">確認匯入</button>
+        <button onclick="cancelExcelImport()" class="btn bg-retro-paper px-3 py-1 text-xs rounded font-serif" data-i18n="btn_cancel">取消</button>
+      </div>
     </div>
   </div>
   <div id="studentList" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2"></div>
@@ -133,64 +156,79 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
     <div class="retro-card p-4 max-w-sm text-center" onclick="event.stopPropagation()">
       <h3 class="font-bold font-serif mb-1" id="qrPreviewName"></h3>
       <div id="qrPreviewImg" class="flex justify-center mb-1"></div>
-      <p class="text-xs text-retro-ink/60 font-serif">讓學生掃此 QR Code 繳交作業</p>
-      <button class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif mt-2" onclick="document.getElementById('qrCodePreview').classList.add('hidden'); document.getElementById('qrPreviewImg').innerHTML='';">關閉</button>
+      <p class="text-xs text-retro-ink/60 font-serif" data-i18n="msg_scan_qr">讓學生掃此 QR Code 繳交作業</p>
+      <button class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif mt-2" onclick="closeQRPreview()" data-i18n="btn_close">關閉</button>
     </div>
   </div>
 </div>
 
-<!-- ===== 科目管理 ===== -->
 <div id="tab-subjects" class="tab-content">
   <div class="retro-card p-3 mb-3">
     <div class="flex gap-2">
-      <input id="subjectInput" placeholder="輸入科目名稱（如：國語、數學）" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm">
-      <button onclick="createSubject()" class="btn bg-[#27ae60] text-white px-3 py-1 text-sm rounded font-bold font-serif">新增</button>
+      <input id="subjectInput" placeholder="輸入科目名稱（如：國語、數學）" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm" data-i18n-placeholder="ph_subject">
+      <button onclick="createSubject()" class="btn bg-[#27ae60] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_add">新增</button>
     </div>
   </div>
   <div id="subjectList" class="flex flex-wrap gap-2"></div>
 </div>
 
-<!-- ===== 作業管理 ===== -->
 <div id="tab-assignments" class="tab-content">
   <div class="retro-card p-3 mb-3">
-    <h3 class="font-bold font-serif mb-1 text-sm">📝 開新作業</h3>
+    <h3 class="font-bold font-serif mb-1 text-sm">📝 <span data-i18n="new_assignment">開新作業</span></h3>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
-      <select id="hwSubject" class="retro-input p-2 rounded-lg font-serif text-sm"><option value="">選擇科目</option></select>
-      <input id="hwTitle" placeholder="作業名稱" class="retro-input p-2 rounded-lg font-serif text-sm">
+      <select id="hwSubject" class="retro-input p-2 rounded-lg font-serif text-sm"><option value="" data-i18n="opt_select_subject">選擇科目</option></select>
+      <input id="hwTitle" placeholder="作業名稱" class="retro-input p-2 rounded-lg font-serif text-sm" data-i18n-placeholder="ph_assignment_title">
       <input id="hwDueDate" type="date" class="retro-input p-2 rounded-lg font-serif text-sm">
-      <input id="hwDesc" placeholder="備註（選填）" class="retro-input p-2 rounded-lg font-serif text-sm">
+      <input id="hwDesc" placeholder="備註（選填）" class="retro-input p-2 rounded-lg font-serif text-sm" data-i18n-placeholder="ph_remark">
     </div>
-    <button onclick="createAssignment()" class="btn bg-[#8e44ad] text-white px-3 py-1 text-sm rounded font-bold font-serif">建立</button>
+    <button onclick="createAssignment()" class="btn bg-[#8e44ad] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_create">建立</button>
   </div>
   <div id="assignmentList"></div>
 </div>
 
-<!-- ===== 繳交檢查 ===== -->
 <div id="tab-check" class="tab-content">
   <div class="mb-2 flex gap-2">
-    <select id="checkAssignment" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm"><option value="">選擇作業</option></select>
-    <button onclick="loadCheckView()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">載入</button>
+    <select id="checkAssignment" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm"><option value="" data-i18n="opt_select_assignment">選擇作業</option></select>
+    <button onclick="loadCheckView()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_load">載入</button>
   </div>
   <div id="checkView" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2"></div>
 </div>
 
-<!-- ===== 全班一覽 ===== -->
+<div id="tab-stats" class="tab-content">
+  <div class="retro-card p-3 mb-3">
+    <h2 class="text-lg font-black font-serif mb-2">📈 <span data-i18n="stats_title">統計圖表</span></h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="retro-card p-2">
+        <h4 class="font-bold font-serif text-sm mb-1" data-i18n="chart_submission_rate">繳交率（依作業）</h4>
+        <canvas id="chartSubmissionRate"></canvas>
+      </div>
+      <div class="retro-card p-2">
+        <h4 class="font-bold font-serif text-sm mb-1" data-i18n="chart_status_dist">整體狀態分布</h4>
+        <canvas id="chartStatusDist"></canvas>
+      </div>
+      <div class="retro-card p-2 md:col-span-2">
+        <h4 class="font-bold font-serif text-sm mb-1" data-i18n="chart_daily_trend">每日繳交趨勢</h4>
+        <canvas id="chartDailyTrend"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="tab-display" class="tab-content">
   <div class="flex justify-between items-center mb-2">
-    <h2 id="displayTitle" class="text-lg font-black font-serif">📺 全班繳交一覽</h2>
-    <button onclick="toggleDisplayMode()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" id="displayModeBtn">隱藏已完成的</button>
+    <h2 id="displayTitle" class="text-lg font-black font-serif">📺 <span data-i18n="display_title">全班繳交一覽</span></h2>
+    <button onclick="toggleDisplayMode()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" id="displayModeBtn" data-i18n="btn_hide_done">隱藏已完成的</button>
   </div>
   <div id="displayGrid" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2"></div>
 </div>
 
-<!-- ===== 報表 ===== -->
 <div id="tab-export" class="tab-content">
   <div class="retro-card p-3">
-    <h3 class="font-bold font-serif mb-2">📊 報表</h3>
+    <h3 class="font-bold font-serif mb-2">📊 <span data-i18n="export_title">報表</span></h3>
     <div class="flex gap-2 flex-wrap">
-      <button onclick="exportCSV()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">📥 下載 CSV</button>
-      <button onclick="printClass()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">🖨️ 列印全班</button>
-      <button onclick="printContactBook()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">📔 聯絡簿</button>
+      <button onclick="exportCSV()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">📥 <span data-i18n="btn_download_csv">下載 CSV</span></button>
+      <button onclick="printClass()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">🖨️ <span data-i18n="btn_print_class">列印全班</span></button>
+      <button onclick="printContactBook()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-bold font-serif">📔 <span data-i18n="btn_contact_book">聯絡簿</span></button>
     </div>
   </div>
   <div id="printArea" class="print-section"></div>
@@ -198,30 +236,185 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 
 </main>
 
-<!-- ===== 登入 Modal ===== -->
 <div id="welcomeModal" class="modal-overlay">
   <div class="retro-card p-6 max-w-sm mx-4 text-center">
-    <h2 class="text-2xl font-black font-serif mb-2">📋 作業繳交系統</h2>
-    <p class="text-sm text-retro-ink/60 mb-4 font-serif">輸入你的姓名開始使用</p>
-    <input id="welcomeName" type="text" placeholder="例如：王老師" class="retro-input w-full p-3 rounded-lg font-serif mb-3">
-    <button onclick="welcomeLogin()" class="btn bg-[#c0392b] text-white px-6 py-3 rounded-lg w-full font-bold font-serif">開始使用</button>
+    <h2 class="text-2xl font-black font-serif mb-2">📋 <span data-i18n="welcome_title">作業繳交系統</span></h2>
+    <p class="text-sm text-retro-ink/60 mb-4 font-serif" data-i18n="welcome_desc">輸入你的姓名開始使用</p>
+    <input id="welcomeName" type="text" placeholder="例如：王老師" class="retro-input w-full p-3 rounded-lg font-serif mb-3" data-i18n-placeholder="ph_name_example">
+    <div id="roleSelectBox" class="hidden mb-3">
+      <p class="text-sm font-bold font-serif mb-2" data-i18n="choose_role">選擇身份</p>
+      <div class="flex gap-2 justify-center">
+        <button onclick="selectRole('teacher')" class="btn bg-[#c0392b] text-white px-4 py-2 rounded font-bold font-serif text-sm" data-i18n="role_teacher">老師</button>
+        <button onclick="selectRole('assistant')" class="btn bg-[#2980b9] text-white px-4 py-2 rounded font-bold font-serif text-sm" data-i18n="role_assistant">小老師</button>
+        <button onclick="selectRole('student')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-bold font-serif text-sm" data-i18n="role_student">學生</button>
+      </div>
+    </div>
+    <button id="welcomeBtn" onclick="welcomeLogin()" class="btn bg-[#c0392b] text-white px-6 py-3 rounded-lg w-full font-bold font-serif" data-i18n="btn_start">開始使用</button>
   </div>
 </div>
 
-<!-- ===== 通用 Modal ===== -->
 <div id="modal" class="modal-overlay">
   <div class="retro-card p-4 max-w-md w-full mx-4">
     <h3 id="modalTitle" class="text-lg font-black font-serif mb-2"></h3>
     <div id="modalBody"></div>
     <div class="flex justify-end gap-2 mt-3">
-      <button onclick="closeModal()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif">關閉</button>
+      <button onclick="closeModal()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" data-i18n="btn_close">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal-overlay">
+  <div class="retro-card p-4 max-w-sm w-full mx-4">
+    <h3 class="text-lg font-black font-serif mb-3">⚙️ <span data-i18n="settings_title">設定</span></h3>
+    <div class="space-y-3 font-serif text-sm">
+      <div class="flex items-center justify-between"><span data-i18n="voice_enabled">語音回饋</span><input type="checkbox" id="settingVoiceEnabled" onchange="saveVoiceSettings()"></div>
+      <div class="flex items-center justify-between"><span data-i18n="voice_lang">語音語言</span><select id="settingVoiceLang" onchange="saveVoiceSettings()" class="retro-input p-1 rounded text-xs"><option value="zh-TW">zh-TW</option><option value="en-US">en-US</option></select></div>
+      <div><div class="flex justify-between mb-1"><span data-i18n="voice_rate">語速</span><span id="rateValue">1.2</span></div><input type="range" id="settingVoiceRate" min="0.5" max="2.0" step="0.1" value="1.2" oninput="document.getElementById('rateValue').textContent=this.value;saveVoiceSettings()" class="slider-thumb w-full"></div>
+      <div class="flex items-center justify-between"><span data-i18n="voice_speak_name">念出學生姓名</span><input type="checkbox" id="settingVoiceSpeakName" onchange="saveVoiceSettings()"></div>
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="closeSettings()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" data-i18n="btn_close">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div id="copyAssignmentModal" class="modal-overlay">
+  <div class="retro-card p-4 max-w-sm w-full mx-4">
+    <h3 class="text-lg font-black font-serif mb-3">📋 <span data-i18n="copy_assignment_title">複製作業到別班</span></h3>
+    <p class="text-xs text-retro-ink/60 mb-2 font-serif" data-i18n="copy_target_hint">選擇目標班級：</p>
+    <select id="copyTargetClass" class="retro-input w-full p-2 rounded font-serif text-sm mb-3"></select>
+    <div class="flex justify-end gap-2">
+      <button onclick="closeCopyAssignmentModal()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" data-i18n="btn_cancel">取消</button>
+      <button onclick="doCopyAssignment()" class="btn bg-[#2980b9] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_confirm">確認</button>
+    </div>
+  </div>
+</div>
+
+<div id="archiveModal" class="modal-overlay">
+  <div class="retro-card p-4 max-w-sm w-full mx-4 text-center">
+    <h3 class="text-lg font-black font-serif mb-2">📦 <span data-i18n="archive_title">封存班級</span></h3>
+    <p class="text-sm text-retro-ink/60 mb-4 font-serif" data-i18n="archive_desc">封存後，此班級將從主畫面隱藏，但可在「封存班級」中查看。</p>
+    <div class="flex justify-center gap-2">
+      <button onclick="closeArchiveModal()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" data-i18n="btn_cancel">取消</button>
+      <button onclick="doArchiveClass()" class="btn bg-[#c0392b] text-white px-3 py-1 text-sm rounded font-bold font-serif" data-i18n="btn_archive">確認封存</button>
     </div>
   </div>
 </div>
 
 <script>
 // ============================================================
-// Supabase 設定
+// i18n dictionary
+// ============================================================
+const i18n = {
+  zh: {
+    tab_submit: '繳交', tab_students: '學生', tab_subjects: '科目', tab_assignments: '作業', tab_check: '檢查',
+    tab_stats: '統計', tab_display: '一覽', tab_export: '報表', btn_login: '登入', btn_enter: '進入',
+    qr_mode_label: 'QR 模式：', qr_mode_student: '學生 QR（一人一碼）', qr_mode_assignment: '作業 QR（一作業一碼）', qr_mode_manual: '手動點名',
+    btn_switch_student: '換學生', msg_enter_or_scan: '👆 輸入座號或掃 QR Code 開始繳交',
+    import_students: '匯入學生名單', import_format_hint: '每行「座號 姓名」，例如：',
+    btn_import: '匯入', excel_import_label: '📁 Excel / CSV 匯入：', preview_rows: '預覽列數：',
+    btn_confirm_import: '確認匯入', btn_cancel: '取消', btn_add: '新增',
+    new_assignment: '開新作業', opt_select_subject: '選擇科目', opt_select_assignment: '選擇作業',
+    ph_assignment_title: '作業名稱', ph_remark: '備註（選填）', btn_create: '建立', btn_load: '載入',
+    stats_title: '統計圖表', chart_submission_rate: '繳交率（依作業）', chart_status_dist: '整體狀態分布',
+    chart_daily_trend: '每日繳交趨勢', display_title: '全班繳交一覽', btn_hide_done: '隱藏已完成的',
+    export_title: '報表', btn_download_csv: '下載 CSV', btn_print_class: '列印全班', btn_contact_book: '聯絡簿',
+    welcome_title: '作業繳交系統', welcome_desc: '輸入你的姓名開始使用', ph_name_example: '例如：王老師',
+    choose_role: '選擇身份', role_teacher: '老師', role_assistant: '小老師', role_student: '學生',
+    btn_start: '開始使用', btn_close: '關閉', settings_title: '設定', voice_enabled: '語音回饋',
+    voice_lang: '語音語言', voice_rate: '語速', voice_speak_name: '念出學生姓名',
+    copy_assignment_title: '複製作業到別班', copy_target_hint: '選擇目標班級：', btn_confirm: '確認',
+    archive_title: '封存班級', archive_desc: '封存後，此班級將從主畫面隱藏，但可在「封存班級」中查看。',
+    btn_archive: '確認封存', msg_scan_qr: '讓學生掃此 QR Code 繳交作業',
+    opt_class: '班級', ph_subject: '輸入科目名稱（如：國語、數學）',
+    status_submitted: '✅已繳', status_missing: '❌缺交', status_needs_correction: '📝待訂正',
+    status_corrected: '✔️已訂正', status_pending: '⏳未繳', status_late: '⚠️遲交',
+    msg_all_done: '全部完成 🎉', msg_no_students: '尚未匯入學生', msg_no_assignments: '無',
+    msg_no_homework: '目前沒有作業', msg_locked: '已繳且鎖定，請找老師解鎖',
+    msg_confirm_submit: '確認繳交此作業？', msg_submit_success: '繳交成功！',
+    msg_late_marked: '已標記為遲交', msg_corrected_done: '訂正完成！', msg_corrected_recorded: '訂正已記錄。',
+    msg_unlocked: '解鎖', msg_mark_correction: '標記訂正', msg_correction_note: '備註',
+    msg_create_class: '建立班級', msg_class_name_example: '班級名稱（如：三年一班）',
+    msg_archive_list: '封存班級', msg_no_archived: '無封存班級',
+    msg_import_format_error: '格式錯誤', msg_please_enter_data: '請輸入資料', msg_please_create_class: '請先建立班級',
+    msg_scan_invalid: '掃碼無效：', msg_connection_failed: '連線失敗：',
+    msg_please_enter_name: '請輸入姓名', msg_select_class_and_seat: '請選擇班級並輸入座號',
+    msg_please_fill_title: '請填寫作業名稱', msg_student_not_found: '查無此學生',
+    msg_reload_failed: '載入失敗：', msg_operation_failed: '操作失敗：',
+    msg_copy_success: '複製成功！', msg_copy_failed: '複製失敗：', msg_archive_success: '封存成功',
+    msg_please_select_target: '請選擇目標班級', msg_offline_ready: '已準備好離線使用',
+    voice_welcome: '歡迎使用', voice_success: '繳交成功', voice_error: '無法繳交',
+    btn_archive_class: '📦 封存'
+  },
+  en: {
+    tab_submit: 'Submit', tab_students: 'Students', tab_subjects: 'Subjects', tab_assignments: 'Assignments', tab_check: 'Check',
+    tab_stats: 'Stats', tab_display: 'Overview', tab_export: 'Export', btn_login: 'Login', btn_enter: 'Enter',
+    qr_mode_label: 'QR Mode:', qr_mode_student: 'Student QR (one per student)', qr_mode_assignment: 'Assignment QR (one per assignment)', qr_mode_manual: 'Manual Roll Call',
+    btn_switch_student: 'Switch Student', msg_enter_or_scan: '👆 Enter seat number or scan QR code to start',
+    import_students: 'Import Student List', import_format_hint: 'One line per student: "Seat Number Name", e.g. ',
+    btn_import: 'Import', excel_import_label: '📁 Excel / CSV Import:', preview_rows: 'Preview rows:',
+    btn_confirm_import: 'Confirm Import', btn_cancel: 'Cancel', btn_add: 'Add',
+    new_assignment: 'New Assignment', opt_select_subject: 'Select Subject', opt_select_assignment: 'Select Assignment',
+    ph_assignment_title: 'Assignment Title', ph_remark: 'Remark (optional)', btn_create: 'Create', btn_load: 'Load',
+    stats_title: 'Statistics', chart_submission_rate: 'Submission Rate by Assignment', chart_status_dist: 'Overall Status Distribution',
+    chart_daily_trend: 'Daily Submission Trend', display_title: 'Class Overview', btn_hide_done: 'Hide Completed',
+    export_title: 'Reports', btn_download_csv: 'Download CSV', btn_print_class: 'Print Class', btn_contact_book: 'Contact Book',
+    welcome_title: 'Homework System', welcome_desc: 'Enter your name to start', ph_name_example: 'e.g. Mr. Wang',
+    choose_role: 'Choose Role', role_teacher: 'Teacher', role_assistant: 'Assistant', role_student: 'Student',
+    btn_start: 'Start', btn_close: 'Close', settings_title: 'Settings', voice_enabled: 'Voice Feedback',
+    voice_lang: 'Voice Language', voice_rate: 'Speech Rate', voice_speak_name: 'Speak Student Name',
+    copy_assignment_title: 'Copy Assignment to Class', copy_target_hint: 'Select target class:', btn_confirm: 'Confirm',
+    archive_title: 'Archive Class', archive_desc: 'After archiving, this class will be hidden from the main view but viewable in "Archived Classes".',
+    btn_archive: 'Confirm Archive', msg_scan_qr: 'Let students scan this QR code to submit',
+    opt_class: 'Class', ph_subject: 'Enter subject name (e.g. Math, English)',
+    status_submitted: '✅Submitted', status_missing: '❌Missing', status_needs_correction: '📝Needs Correction',
+    status_corrected: '✔️Corrected', status_pending: '⏳Pending', status_late: '⚠️Late',
+    msg_all_done: 'All done 🎉', msg_no_students: 'No students imported yet', msg_no_assignments: 'None',
+    msg_no_homework: 'No assignments currently', msg_locked: 'Already submitted and locked, ask teacher to unlock',
+    msg_confirm_submit: 'Confirm submission?', msg_submit_success: 'Submitted successfully!',
+    msg_late_marked: 'Marked as late', msg_corrected_done: 'Correction done!', msg_corrected_recorded: 'Correction recorded.',
+    msg_unlocked: 'Unlock', msg_mark_correction: 'Mark for correction', msg_correction_note: 'Note',
+    msg_create_class: 'Create Class', msg_class_name_example: 'Class name (e.g. Class 3A)',
+    msg_archive_list: 'Archived Classes', msg_no_archived: 'No archived classes',
+    msg_import_format_error: 'Format error', msg_please_enter_data: 'Please enter data', msg_please_create_class: 'Please create a class first',
+    msg_scan_invalid: 'Invalid QR scan: ', msg_connection_failed: 'Connection failed: ',
+    msg_please_enter_name: 'Please enter name', msg_select_class_and_seat: 'Please select class and enter seat number',
+    msg_please_fill_title: 'Please fill in assignment title', msg_student_not_found: 'Student not found',
+    msg_reload_failed: 'Load failed: ', msg_operation_failed: 'Operation failed: ',
+    msg_copy_success: 'Copied successfully!', msg_copy_failed: 'Copy failed: ', msg_archive_success: 'Archived successfully',
+    msg_please_select_target: 'Please select target class', msg_offline_ready: 'Ready for offline use',
+    voice_welcome: 'Welcome', voice_success: 'Submission successful', voice_error: 'Submission failed',
+    btn_archive_class: '📦 Archive'
+  }
+};
+
+function t(key, fallback) {
+  return i18n[state.lang] && i18n[state.lang][key] !== undefined ? i18n[state.lang][key] : (fallback !== undefined ? fallback : (i18n.zh[key] || key));
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (i18n[state.lang] && i18n[state.lang][k]) el.textContent = i18n[state.lang][k];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const k = el.getAttribute('data-i18n-placeholder');
+    if (i18n[state.lang] && i18n[state.lang][k]) el.placeholder = i18n[state.lang][k];
+  });
+  const ll = document.getElementById('langLabel');
+  if (ll) ll.textContent = state.lang === 'zh' ? '中文' : 'EN';
+  document.documentElement.lang = state.lang === 'zh' ? 'zh-TW' : 'en';
+}
+
+function toggleLang() {
+  state.lang = state.lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('app_lang', state.lang);
+  applyI18n();
+  renderAllTabs();
+}
+
+// ============================================================
+// Supabase config
 // ============================================================
 const SUPABASE_URL = 'https://ngyhbvvjcmuwujufyche.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-kg258b_zjzHRkT96c1PjA_BD8Au2Pb';
@@ -230,6 +423,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let state = {
   teacherName: localStorage.getItem('teacher_name') || '',
+  role: localStorage.getItem('teacher_role') || 'teacher',
+  lang: localStorage.getItem('app_lang') || 'zh',
   classes: [],
   currentClassId: null,
   students: [],
@@ -237,17 +432,24 @@ let state = {
   assignments: [],
   submissions: [],
   currentToken: null,
-  displayMode: 'all'
+  displayMode: 'all',
+  qrMode: localStorage.getItem('qr_mode') || 'student',
+  voiceSettings: JSON.parse(localStorage.getItem('voice_settings') || '{"enabled":true,"lang":"zh-TW","rate":1.2,"speakName":false}'),
+  excelBuffer: null,
+  archived: JSON.parse(localStorage.getItem('archived_classes') || '[]'),
+  copyAssignmentId: null
 };
 
+let chartInstances = {};
+
 // ============================================================
-// 工具函式
+// Utilities
 // ============================================================
 function generateToken() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let t = '';
-  for (let i = 0; i < 16; i++) t += chars.charAt(Math.floor(Math.random() * chars.length));
-  return t;
+  let tok = '';
+  for (let i = 0; i < 16; i++) tok += chars.charAt(Math.floor(Math.random() * chars.length));
+  return tok;
 }
 function todayStr() {
   const d = new Date();
@@ -258,19 +460,48 @@ function nowStr() {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
 }
 function statusClass(s) { return { submitted:'status-submitted', missing:'status-missing', needs_correction:'status-needs_correction', corrected:'status-corrected', pending:'status-pending', late:'status-late' }[s] || 'status-pending'; }
-function statusLabel(s) { return { submitted:'✅已繳', missing:'❌缺交', needs_correction:'📝待訂正', corrected:'✔️已訂正', pending:'⏳未繳', late:'⚠️遲交' }[s] || s; }
+function statusLabel(s) { return t('status_' + (s||'pending')); }
+function isReadOnly() { return state.role === 'assistant'; }
+function isStudentRole() { return state.role === 'student'; }
 
 // ============================================================
-// 登入
+// Login & Role
 // ============================================================
 function welcomeLogin() {
   const name = document.getElementById('welcomeName').value.trim();
-  if (!name) { alert('請輸入姓名'); return; }
+  if (!name) { alert(t('msg_please_enter_name')); return; }
   state.teacherName = name;
   localStorage.setItem('teacher_name', name);
-  document.getElementById('welcomeModal').classList.remove('active');
-  afterLogin();
+  if (state.role === 'student') {
+    document.getElementById('welcomeModal').classList.remove('active');
+    enterStudentMode();
+    return;
+  }
+  document.getElementById('roleSelectBox').classList.remove('hidden');
+  document.getElementById('welcomeBtn').classList.add('hidden');
 }
+
+function selectRole(role) {
+  state.role = role;
+  localStorage.setItem('teacher_role', role);
+  document.getElementById('welcomeModal').classList.remove('active');
+  if (role === 'student') {
+    enterStudentMode();
+  } else {
+    afterLogin();
+  }
+}
+
+function enterStudentMode() {
+  document.getElementById('loginArea').classList.add('hidden');
+  document.getElementById('teacherArea').classList.add('hidden');
+  document.getElementById('classSelector').classList.add('hidden');
+  document.getElementById('roleDisplay').classList.remove('hidden');
+  document.getElementById('roleDisplay').textContent = t('role_student');
+  switchMainTab('submit');
+  updateStudentClassSelect();
+}
+
 function teacherLogin() {
   const name = document.getElementById('teacherNameInput').value.trim();
   if (!name) return;
@@ -278,6 +509,7 @@ function teacherLogin() {
   localStorage.setItem('teacher_name', name);
   afterLogin();
 }
+
 function showSwitchTeacher() {
   document.getElementById('loginArea').classList.remove('hidden');
   document.getElementById('loginArea').classList.add('flex');
@@ -287,43 +519,58 @@ function showSwitchTeacher() {
   document.getElementById('teacherNameInput').value = '';
   document.getElementById('teacherNameInput').focus();
 }
+
 function teacherLogout() {
   state.teacherName = '';
+  state.role = 'teacher';
   localStorage.removeItem('teacher_name');
+  localStorage.removeItem('teacher_role');
   localStorage.removeItem('last_class_id');
+  document.getElementById('roleDisplay').classList.add('hidden');
   showSwitchTeacher();
 }
+
 async function afterLogin() {
   document.getElementById('loginArea').classList.add('hidden');
   document.getElementById('teacherArea').classList.remove('hidden');
   document.getElementById('teacherArea').classList.add('flex');
-  document.getElementById('teacherNameDisplay').textContent = state.teacherName + ' 老師';
+  document.getElementById('teacherNameDisplay').textContent = state.teacherName + ' ' + (state.role === 'assistant' ? t('role_assistant') : t('role_teacher'));
+  document.getElementById('roleDisplay').classList.remove('hidden');
+  document.getElementById('roleDisplay').textContent = state.role === 'assistant' ? t('role_assistant') : t('role_teacher');
   try {
     await loadClasses();
   } catch (e) {
-    alert('連線失敗：' + e.message);
+    alert(t('msg_connection_failed') + e.message);
   }
 }
 
 // ============================================================
-// 班級管理
+// Class management (with archive)
 // ============================================================
 async function loadClasses() {
   const { data, error } = await sb.from('classes').select('*').eq('teacher_name', state.teacherName).order('id');
   if (error) throw error;
-  state.classes = data || [];
+  state.classes = (data || []).filter(c => !state.archived.includes(c.id));
   const sel = document.getElementById('classSelectNav');
-  sel.innerHTML = state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  let html = state.classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  if (state.archived.length > 0) {
+    html += '<optgroup label="' + t('msg_archive_list') + '">' + (data || []).filter(c => state.archived.includes(c.id)).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('') + '</optgroup>';
+  }
+  sel.innerHTML = html;
   document.getElementById('classSelector').classList.remove('hidden');
   if (state.classes.length > 0) {
     const lastId = parseInt(localStorage.getItem('last_class_id') || '0');
-    const target = state.classes.find(c => c.id === lastId) ? lastId : state.classes[0].id;
+    const all = data || [];
+    const target = all.find(c => c.id === lastId) ? lastId : state.classes[0].id;
     await switchClass(target);
+  } else if ((data || []).length > 0 && state.archived.length > 0) {
+    showModal(t('msg_archive_list'), '<p class="font-serif text-sm">' + t('msg_no_archived') + '</p>');
   } else {
     showCreateClass();
   }
   updateStudentClassSelect();
 }
+
 async function switchClass(id) {
   state.currentClassId = id;
   localStorage.setItem('last_class_id', id);
@@ -331,6 +578,7 @@ async function switchClass(id) {
   await loadClassData();
   renderAllTabs();
 }
+
 async function loadClassData() {
   const cid = state.currentClassId;
   if (!cid) return;
@@ -347,74 +595,160 @@ async function loadClassData() {
   state.assignments = aRes.data || [];
   state.submissions = [];
 }
+
 function renderAllTabs() {
   renderStudents();
   renderSubjects();
   renderAssignments();
   initCheckView();
   renderDisplay();
+  renderStats();
 }
+
 function updateStudentClassSelect() {
   const sel = document.getElementById('studentClassSelect');
-  sel.innerHTML = '<option value="">班級</option>' + state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML = '<option value="">' + t('opt_class') + '</option>' + (state.classes || []).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+}
+
+function showCreateClass() {
+  showModal(t('msg_create_class'), '<input id="newClassName" placeholder="' + t('msg_class_name_example') + '" class="retro-input w-full p-2 rounded font-serif text-sm"><button onclick="doCreateClass()" class="btn bg-[#c0392b] text-white px-3 py-1 rounded font-serif text-sm mt-2 w-full">' + t('btn_create') + '</button>');
+}
+
+async function doCreateClass() {
+  const name = document.getElementById('newClassName').value.trim();
+  if (!name) return;
+  const { error } = await sb.from('classes').insert([{ name, teacher_name: state.teacherName }]);
+  if (error) { alert(error.message); return; }
+  await loadClasses();
+  closeModal();
+}
+
+function showArchiveModal() {
+  document.getElementById('archiveModal').classList.add('active');
+}
+function closeArchiveModal() {
+  document.getElementById('archiveModal').classList.remove('active');
+}
+async function doArchiveClass() {
+  closeArchiveModal();
+  if (!state.currentClassId) return;
+  if (!state.archived.includes(state.currentClassId)) {
+    state.archived.push(state.currentClassId);
+    localStorage.setItem('archived_classes', JSON.stringify(state.archived));
+  }
+  alert(t('msg_archive_success'));
+  await loadClasses();
 }
 
 // ============================================================
-// Tab 切換
+// Tab switching
 // ============================================================
 function switchMainTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+  const tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
   if (tab === 'display') renderDisplay();
+  if (tab === 'stats') renderStats();
 }
 
 // ============================================================
-// 學生管理
+// Students
 // ============================================================
 function renderStudents() {
   const el = document.getElementById('studentList');
   if (!state.students.length) {
-    el.innerHTML = '<div class="text-retro-ink/50 font-serif text-sm col-span-full">尚未匯入學生</div>';
+    el.innerHTML = '<div class="text-retro-ink/50 font-serif text-sm col-span-full">' + t('msg_no_students') + '</div>';
     return;
   }
-  el.innerHTML = state.students.map(s => `
-    <div class="retro-card p-1 text-center text-xs font-serif cursor-pointer hover:bg-white" onclick="showQR('${s.name}', ${s.student_number}, '${s.qr_token || ''}')">
-      <span class="font-black">${s.student_number}</span>. ${s.name}
-      <div class="text-[10px] text-retro-ink/40 mt-0.5">${s.qr_token ? '📱 QR' : '❌'}</div>
-    </div>
-  `).join('');
+  el.innerHTML = state.students.map(s => {
+    const ro = isReadOnly() ? '' : ' onclick="showQR(' + JSON.stringify(s.name).slice(1,-1) + ',' + s.student_number + ',' + JSON.stringify(s.qr_token || '').slice(1,-1) + ')"';
+    return '<div class="retro-card p-1 text-center text-xs font-serif cursor-pointer hover:bg-white"' + ro + '><span class="font-black">' + s.student_number + '</span>. ' + s.name + '<div class="text-[10px] text-retro-ink/40 mt-0.5">' + (s.qr_token ? '📱 QR' : '❌') + '</div></div>';
+  }).join('');
 }
+
 async function importStudents() {
   const input = document.getElementById('studentInput').value.trim();
   const result = document.getElementById('importResult');
-  if (!input) { result.textContent = '請輸入資料'; return; }
-  if (!state.currentClassId) { result.textContent = '請先建立班級'; return; }
-  const lines = input.split('\n').filter(l => l.trim());
+  if (!input) { result.textContent = t('msg_please_enter_data'); return; }
+  if (!state.currentClassId) { result.textContent = t('msg_please_create_class'); return; }
+  const lines = input.split('
+').filter(l => l.trim());
   const students = [];
   lines.forEach(line => {
     const m = line.trim().match(/^(\d+)[\s,，.]+(.+)$/);
     if (m) students.push({ class_id: state.currentClassId, student_number: parseInt(m[1]), name: m[2].trim(), qr_token: generateToken() });
   });
-  if (students.length === 0) { result.textContent = '格式錯誤'; return; }
+  if (students.length === 0) { result.textContent = t('msg_import_format_error'); return; }
   try {
     const { data, error } = await sb.from('students').upsert(students, { onConflict: 'class_id,student_number' }).select();
     if (error) throw error;
-    result.textContent = '✅ ' + (data ? data.length : students.length) + ' 人';
+    result.textContent = '✅ ' + (data ? data.length : students.length) + ' ' + (state.lang==='zh'?'人':'students');
     await loadClassData();
     renderStudents();
   } catch (e) { result.textContent = '❌ ' + e.message; }
 }
 
 // ============================================================
+// Excel import via SheetJS
+// ============================================================
+function handleExcelFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+    state.excelBuffer = [];
+    const preview = [];
+    rows.forEach((row, idx) => {
+      if (!row || row.length < 2) return;
+      const num = parseInt(row[0]);
+      const name = String(row[1]).trim();
+      if (!isNaN(num) && name) {
+        state.excelBuffer.push({ class_id: state.currentClassId, student_number: num, name, qr_token: generateToken() });
+        preview.push('<div>' + num + ' ' + name + '</div>');
+      }
+    });
+    document.getElementById('excelPreviewContent').innerHTML = preview.slice(0,20).join('') + (preview.length > 20 ? '<div>...</div>' : '');
+    document.getElementById('excelPreview').classList.remove('hidden');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cancelExcelImport() {
+  state.excelBuffer = null;
+  document.getElementById('excelPreview').classList.add('hidden');
+  document.getElementById('excelFileInput').value = '';
+}
+
+async function confirmExcelImport() {
+  if (!state.excelBuffer || state.excelBuffer.length === 0) return;
+  try {
+    const { data, error } = await sb.from('students').upsert(state.excelBuffer, { onConflict: 'class_id,student_number' }).select();
+    if (error) throw error;
+    document.getElementById('importResult').textContent = '✅ Excel ' + (data ? data.length : state.excelBuffer.length) + ' ' + (state.lang==='zh'?'人':'students');
+    state.excelBuffer = null;
+    document.getElementById('excelPreview').classList.add('hidden');
+    document.getElementById('excelFileInput').value = '';
+    await loadClassData();
+    renderStudents();
+  } catch (e) { alert(e.message); }
+}
+
+// ============================================================
 // QR Code
 // ============================================================
-function getQRUrl(token) {
+function getQRUrl(token, assignmentId) {
   const base = window.location.href.split('#')[0];
+  if (assignmentId) return base + '#/assignment/' + assignmentId;
   return token ? base + '#/student/' + token : base + '#/student';
 }
+
 function showQR(name, sid, token) {
   const modal = document.getElementById('qrCodePreview');
   modal.classList.remove('hidden');
@@ -425,22 +759,27 @@ function showQR(name, sid, token) {
   if (typeof QRCode !== 'undefined') {
     new QRCode(preview, { text: url, width: 150, height: 150 });
   } else {
-    preview.innerHTML = '<div class="text-center text-retro-ink/50 font-serif text-xs">QR Code 載入中...<br><span class="text-[10px]">' + url + '</span></div>';
+    preview.innerHTML = '<div class="text-center text-retro-ink/50 font-serif text-xs">QR Code loading...<br><span class="text-[10px]">' + url + '</span></div>';
   }
 }
+function closeQRPreview() {
+  document.getElementById('qrCodePreview').classList.add('hidden');
+  document.getElementById('qrPreviewImg').innerHTML = '';
+}
+
 function printQRCodes() {
   const el = document.getElementById('printArea');
   const c = state.classes.find(x => x.id === state.currentClassId);
-  el.innerHTML = `<style>.qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;padding:15px}.qr-item{text-align:center;border:1px dashed #ccc;padding:10px;page-break-inside:avoid}@media print{body{background:white}}</style>
-  <h2 style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:15px;">${c ? c.name : ''} QR Code</h2><div class="qr-grid" id="qrGrid"></div>`;
-  document.getElementById('printArea').classList.remove('print-section');
-  document.getElementById('printArea').style.display = 'block';
+  el.innerHTML = '<style>.qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;padding:15px}.qr-item{text-align:center;border:1px dashed #ccc;padding:10px;page-break-inside:avoid}@media print{body{background:white}}</style>' +
+    '<h2 style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:15px;">' + (c ? c.name : '') + ' QR Code</h2><div class="qr-grid" id="qrGrid"></div>';
+  el.classList.remove('print-section');
+  el.style.display = 'block';
   const grid = document.getElementById('qrGrid');
   state.students.sort((a, b) => a.student_number - b.student_number).forEach(s => {
     const item = document.createElement('div');
     item.className = 'qr-item';
     const url = getQRUrl(s.qr_token);
-    item.innerHTML = `<div style="font-size:13px;font-weight:bold;margin-bottom:5px;">${s.student_number}. ${s.name}</div><div id="qr_${s.student_number}"></div><div style="font-size:9px;color:#999;margin-top:5px;">${url}</div>`;
+    item.innerHTML = '<div style="font-size:13px;font-weight:bold;margin-bottom:5px;">' + s.student_number + '. ' + s.name + '</div><div id="qr_' + s.student_number + '"></div><div style="font-size:9px;color:#999;margin-top:5px;">' + url + '</div>';
     grid.appendChild(item);
     setTimeout(() => {
       const qrEl = document.getElementById('qr_' + s.student_number);
@@ -450,16 +789,24 @@ function printQRCodes() {
   setTimeout(() => window.print(), 1000);
 }
 
+function changeQRMode(mode) {
+  state.qrMode = mode;
+  localStorage.setItem('qr_mode', mode);
+  document.getElementById('qrModeSelect').value = mode;
+}
+
 // ============================================================
-// 科目
+// Subjects
 // ============================================================
 function renderSubjects() {
   const el = document.getElementById('subjectList');
   el.innerHTML = state.subjects.length === 0
-    ? '<div class="text-retro-ink/50 font-serif text-sm">無</div>'
-    : state.subjects.map(s => `<span class="retro-card px-2 py-0.5 text-sm font-serif">📚 ${s.name}</span>`).join('');
+    ? '<div class="text-retro-ink/50 font-serif text-sm">' + t('msg_no_assignments') + '</div>'
+    : state.subjects.map(s => '<span class="retro-card px-2 py-0.5 text-sm font-serif">📚 ' + s.name + '</span>').join('');
 }
+
 async function createSubject() {
+  if (isReadOnly()) { alert('Read-only'); return; }
   const name = document.getElementById('subjectInput').value.trim();
   if (!name || !state.currentClassId) return;
   const { error } = await sb.from('subjects').insert([{ class_id: state.currentClassId, name }]);
@@ -470,28 +817,29 @@ async function createSubject() {
 }
 
 // ============================================================
-// 作業
+// Assignments
 // ============================================================
 function renderAssignments() {
   const el = document.getElementById('assignmentList');
   const sel = document.getElementById('hwSubject');
-  sel.innerHTML = state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  sel.innerHTML = '<option value="">' + t('opt_select_subject') + '</option>' + state.subjects.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
   if (!state.assignments.length) {
-    el.innerHTML = '<div class="text-retro-ink/50 font-serif text-sm">無</div>'; return;
+    el.innerHTML = '<div class="text-retro-ink/50 font-serif text-sm">' + t('msg_no_assignments') + '</div>'; return;
   }
   el.innerHTML = state.assignments.map(a => {
     const subName = a.subjects ? a.subjects.name : '';
-    return `<div class="retro-card p-2 mb-1 flex justify-between items-center text-sm font-serif">
-      <span><b>${subName ? '[' + subName + '] ' : ''}${a.title}</b> <span class="text-xs text-retro-ink/50">截止 ${a.due_date || '無'}</span></span>
-    </div>`;
+    const copyBtn = isReadOnly() ? '' : ' <button onclick="openCopyAssignmentModal(' + a.id + ')" class="btn bg-retro-paper px-2 py-0.5 text-xs rounded font-serif ml-1">📋 ' + (state.lang==='zh'?'複製':'Copy') + '</button>';
+    return '<div class="retro-card p-2 mb-1 flex justify-between items-center text-sm font-serif"><span><b>' + (subName ? '[' + subName + '] ' : '') + a.title + '</b> <span class="text-xs text-retro-ink/50">' + (state.lang==='zh'?'截止':'Due') + ' ' + (a.due_date || t('msg_no_assignments')) + '</span></span>' + copyBtn + '</div>';
   }).join('');
 }
+
 async function createAssignment() {
+  if (isReadOnly()) { alert('Read-only'); return; }
   const title = document.getElementById('hwTitle').value.trim();
   const subjectId = document.getElementById('hwSubject').value;
   const dueDate = document.getElementById('hwDueDate').value;
   const desc = document.getElementById('hwDesc').value.trim();
-  if (!title || !state.currentClassId) { alert('請填寫作業名稱'); return; }
+  if (!title || !state.currentClassId) { alert(t('msg_please_fill_title')); return; }
   const { error } = await sb.from('assignments').insert([{
     class_id: state.currentClassId,
     subject_id: subjectId || null,
@@ -505,17 +853,47 @@ async function createAssignment() {
   renderAssignments();
 }
 
+function openCopyAssignmentModal(aid) {
+  state.copyAssignmentId = aid;
+  const sel = document.getElementById('copyTargetClass');
+  sel.innerHTML = state.classes.filter(c => c.id !== state.currentClassId).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  document.getElementById('copyAssignmentModal').classList.add('active');
+}
+function closeCopyAssignmentModal() {
+  document.getElementById('copyAssignmentModal').classList.remove('active');
+  state.copyAssignmentId = null;
+}
+async function doCopyAssignment() {
+  const targetId = parseInt(document.getElementById('copyTargetClass').value);
+  if (!targetId) { alert(t('msg_please_select_target')); return; }
+  const src = state.assignments.find(a => a.id === state.copyAssignmentId);
+  if (!src) return;
+  try {
+    const { error } = await sb.from('assignments').insert([{
+      class_id: targetId,
+      subject_id: null,
+      title: src.title,
+      due_date: src.due_date,
+      description: src.description
+    }]);
+    if (error) throw error;
+    alert(t('msg_copy_success'));
+    closeCopyAssignmentModal();
+  } catch (e) { alert(t('msg_copy_failed') + e.message); }
+}
+
 // ============================================================
-// 繳交檢查
+// Check view
 // ============================================================
 async function initCheckView() {
   const sel = document.getElementById('checkAssignment');
-  sel.innerHTML = '<option value="">選擇作業</option>' + state.assignments.map(a => {
+  sel.innerHTML = '<option value="">' + t('opt_select_assignment') + '</option>' + state.assignments.map(a => {
     const subName = a.subjects ? a.subjects.name : '';
-    return `<option value="${a.id}">${subName ? '[' + subName + '] ' : ''}${a.title}</option>`;
+    return '<option value="' + a.id + '">' + (subName ? '[' + subName + '] ' : '') + a.title + '</option>';
   }).join('');
   if (state.assignments.length > 0) { sel.value = state.assignments[0].id; await loadCheckView(); }
 }
+
 async function loadCheckView() {
   const aid = parseInt(document.getElementById('checkAssignment').value);
   if (!aid) return;
@@ -528,24 +906,23 @@ async function loadCheckView() {
       const sub = subs.find(x => x.student_id === s.id);
       const status = sub ? sub.status : (assignment && assignment.due_date && assignment.due_date < todayStr() ? 'missing' : 'pending');
       const locked = sub ? sub.locked : false;
-      return `<div class="student-card retro-card p-1 text-center text-xs relative ${statusClass(status)}" onclick="handleCheckClick(${aid}, ${s.id}, '${sub ? sub.status : ''}', ${locked}, ${s.student_number}, '${s.name}')">
-        <div class="font-black text-sm">${s.student_number}</div>
-        <div class="text-[10px]">${s.name}</div>
-        <div class="font-bold text-[10px]">${statusLabel(status)}</div>
-        ${locked ? '<div class="text-[10px] text-red-600">🔒</div>' : ''}
-        ${sub && sub.note ? '<div class="text-[10px] text-orange-600">📝' + sub.note + '</div>' : ''}
-      </div>`;
+      const onclick = isReadOnly() ? '' : ' onclick="handleCheckClick(' + aid + ',' + s.id + ','' + (sub ? sub.status : '') + '',' + locked + ',' + s.student_number + ',' + JSON.stringify(s.name).slice(1,-1) + ')"';
+      return '<div class="student-card retro-card p-1 text-center text-xs relative ' + statusClass(status) + '"' + onclick + '><div class="font-black text-sm">' + s.student_number + '</div><div class="text-[10px]">' + s.name + '</div><div class="font-bold text-[10px]">' + statusLabel(status) + '</div>' + (locked ? '<div class="text-[10px] text-red-600">🔒</div>' : '') + (sub && sub.note ? '<div class="text-[10px] text-orange-600">📝' + sub.note + '</div>' : '') + '</div>';
     }).join('');
   } catch (e) { alert(e.message); }
 }
+
 async function handleCheckClick(aid, sid, currentStatus, locked, studentNum, studentName) {
+  if (isReadOnly()) return;
   const actions = [];
-  if (currentStatus === 'submitted' || currentStatus === 'late' || currentStatus === '') actions.push({ label: '❌ 缺交', action: 'toggle' }, { label: '📝 標記訂正', action: 'correct' });
-  if (currentStatus === 'needs_correction') actions.push({ label: '✔️ 已訂正', action: 'corrected' }, { label: '✅ 已繳', action: 'toggle' });
-  if (locked) actions.push({ label: '🔓 解鎖', action: 'unlock' });
-  if (currentStatus === '') actions.push({ label: '✅ 已繳', action: 'toggle' });
-  showModal(studentNum + '. ' + studentName, actions.map(a => `<button onclick="doCheckAction(${aid}, ${sid}, '${a.action}')" class="btn bg-retro-paper px-3 py-1 rounded font-serif text-sm w-full mb-1 text-left">${a.label}</button>`).join('') || '<p class="font-serif text-sm">無操作</p>');
+  if (currentStatus === 'submitted' || currentStatus === 'late' || currentStatus === '') actions.push({ label: '❌ ' + t('status_missing'), action: 'toggle' }, { label: '📝 ' + t('msg_mark_correction'), action: 'correct' });
+  if (currentStatus === 'needs_correction') actions.push({ label: '✔️ ' + t('status_corrected'), action: 'corrected' }, { label: '✅ ' + t('status_submitted'), action: 'toggle' });
+  if (locked) actions.push({ label: '🔓 ' + t('msg_unlocked'), action: 'unlock' });
+  if (currentStatus === '') actions.push({ label: '✅ ' + t('status_submitted'), action: 'toggle' });
+  const buttons = actions.map(a => '<button onclick="doCheckAction(' + aid + ',' + sid + ','' + a.action + '')" class="btn bg-retro-paper px-3 py-1 rounded font-serif text-sm w-full mb-1 text-left">' + a.label + '</button>').join('') || '<p class="font-serif text-sm">No actions</p>';
+  showModal(studentNum + '. ' + studentName, buttons);
 }
+
 async function doCheckAction(aid, sid, action) {
   closeModal();
   try {
@@ -559,7 +936,7 @@ async function doCheckAction(aid, sid, action) {
       }
     }
     else if (action === 'correct') {
-      showModal('標記訂正', `<input id="correctionNote" placeholder="備註" class="retro-input w-full p-2 rounded font-serif text-sm mb-2"><button onclick="doCorrectionNote(${aid}, ${sid})" class="btn bg-[#e67e22] text-white px-3 py-1 rounded font-serif w-full text-sm">確認</button>`);
+      showModal(t('msg_mark_correction'), '<input id="correctionNote" placeholder="' + t('msg_correction_note') + '" class="retro-input w-full p-2 rounded font-serif text-sm mb-2"><button onclick="doCorrectionNote(' + aid + ',' + sid + ')" class="btn bg-[#e67e22] text-white px-3 py-1 rounded font-serif w-full text-sm">' + t('btn_confirm') + '</button>');
       return;
     }
     else if (action === 'corrected') {
@@ -573,6 +950,7 @@ async function doCheckAction(aid, sid, action) {
     await loadCheckView();
   } catch (e) { alert(e.message); }
 }
+
 async function doCorrectionNote(aid, sid) {
   const note = document.getElementById('correctionNote').value.trim();
   closeModal();
@@ -586,12 +964,95 @@ async function doCorrectionNote(aid, sid) {
 }
 
 // ============================================================
-// 全班一覽
+// Stats (Chart.js)
+// ============================================================
+async function renderStats() {
+  if (!state.currentClassId) return;
+  const assignmentIds = state.assignments.map(a => a.id);
+  let subs = [];
+  if (assignmentIds.length) {
+    const { data } = await sb.from('submissions').select('*').in('assignment_id', assignmentIds);
+    subs = data || [];
+  }
+  state.submissions = subs;
+
+  const barLabels = state.assignments.slice().reverse().map(a => a.title);
+  const barData = state.assignments.slice().reverse().map(a => {
+    const total = state.students.length || 1;
+    const done = subs.filter(s => s.assignment_id === a.id && (s.status === 'submitted' || s.status === 'late' || s.status === 'corrected')).length;
+    return Math.round(done / total * 100);
+  });
+  renderChart('chartSubmissionRate', 'bar', barLabels, barData, t('chart_submission_rate'));
+
+  const counts = { submitted:0, missing:0, needs_correction:0, corrected:0, pending:0, late:0 };
+  state.students.forEach(s => {
+    state.assignments.forEach(a => {
+      const sub = subs.find(x => x.student_id === s.id && x.assignment_id === a.id);
+      let st = sub ? sub.status : (a.due_date && a.due_date < todayStr() ? 'missing' : 'pending');
+      if (counts[st] !== undefined) counts[st]++;
+    });
+  });
+  const pieLabels = [t('status_submitted'), t('status_missing'), t('status_needs_correction'), t('status_corrected'), t('status_pending'), t('status_late')];
+  const pieData = [counts.submitted, counts.missing, counts.needs_correction, counts.corrected, counts.pending, counts.late];
+  renderPieChart('chartStatusDist', pieLabels, pieData, t('chart_status_dist'));
+
+  const days = [];
+  const dayCounts = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    days.push(ds.slice(5));
+    dayCounts.push(subs.filter(s => s.submitted_at && s.submitted_at.startsWith(ds)).length);
+  }
+  renderLineChart('chartDailyTrend', days, dayCounts, t('chart_daily_trend'));
+}
+
+function renderChart(canvasId, type, labels, data, label) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: type,
+    data: {
+      labels: labels,
+      datasets: [{ label: label, data: data, backgroundColor: 'rgba(192,57,43,0.6)', borderColor: '#c0392b', borderWidth: 2 }]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+  });
+}
+
+function renderPieChart(canvasId, labels, data, title) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+  const colors = ['#27ae60','#c0392b','#e67e22','#2980b9','#bdc3c7','#e74c3c'];
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'pie',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors }] },
+    options: { responsive: true, plugins: { title: { display: true, text: title } } }
+  });
+}
+
+function renderLineChart(canvasId, labels, data, label) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{ label: label, data: data, fill: true, backgroundColor: 'rgba(41,128,185,0.2)', borderColor: '#2980b9', borderWidth: 2, tension: 0.3 }]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+// ============================================================
+// Display board
 // ============================================================
 async function renderDisplay() {
   const el = document.getElementById('displayGrid');
-  if (!state.students.length) { el.innerHTML = '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">無學生</div>'; return; }
-  // Load all submissions for current class
+  if (!state.students.length) { el.innerHTML = '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">' + t('msg_no_students') + '</div>'; return; }
   const assignmentIds = state.assignments.map(a => a.id);
   let subs = [];
   if (assignmentIds.length) {
@@ -607,27 +1068,24 @@ async function renderDisplay() {
     if (state.displayMode === 'hide' && !hasMissing && !hasCorrection) return '';
     if (hasMissing) status = 'missing';
     if (hasCorrection) status = 'correction';
-    return `<div class="student-card retro-card p-1 text-center text-xs ${status === 'missing' ? 'status-missing' : status === 'correction' ? 'status-needs_correction' : 'status-submitted'}">
-      <div class="font-black">${s.student_number}</div>
-      <div class="text-[10px]">${s.name}</div>
-      <div class="font-bold text-[10px]">${status === 'missing' ? '❌缺交' : status === 'correction' ? '📝待訂正' : '✅完成'}</div>
-      ${latestAssignments.length ? '<div class="mt-0.5">' + latestAssignments.map(a => { const sub = subs.find(x => x.assignment_id === a.id && x.student_id === s.id); return `<span class="text-[10px] ${sub && (sub.status === 'submitted' || sub.status === 'late' || sub.status === 'corrected') ? 'text-green-600' : 'text-red-400'}">${sub && (sub.status === 'submitted' || sub.status === 'late' || sub.status === 'corrected') ? '✓' : '○'}</span>`; }).join('') + '</div>' : ''}
-    </div>`;
-  }).filter(Boolean).join('') || '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">全部完成 🎉</div>';
+    const indicators = latestAssignments.length ? '<div class="mt-0.5">' + latestAssignments.map(a => { const sub = subs.find(x => x.assignment_id === a.id && x.student_id === s.id); return '<span class="text-[10px] ' + (sub && (sub.status === 'submitted' || sub.status === 'late' || sub.status === 'corrected') ? 'text-green-600' : 'text-red-400') + '">' + (sub && (sub.status === 'submitted' || sub.status === 'late' || sub.status === 'corrected') ? '✓' : '○') + '</span>'; }).join('') + '</div>' : '';
+    return '<div class="student-card retro-card p-1 text-center text-xs ' + (status === 'missing' ? 'status-missing' : status === 'correction' ? 'status-needs_correction' : 'status-submitted') + '"><div class="font-black">' + s.student_number + '</div><div class="text-[10px]">' + s.name + '</div><div class="font-bold text-[10px]">' + (status === 'missing' ? '❌' + (state.lang==='zh'?'缺交':'Missing') : status === 'correction' ? '📝' + (state.lang==='zh'?'待訂正':'Correction') : '✅' + (state.lang==='zh'?'完成':'Done')) + '</div>' + indicators + '</div>';
+  }).filter(Boolean).join('') || '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">' + t('msg_all_done') + '</div>';
 }
+
 function toggleDisplayMode() {
   state.displayMode = state.displayMode === 'all' ? 'hide' : 'all';
-  document.getElementById('displayModeBtn').textContent = state.displayMode === 'all' ? '隱藏已完成的' : '顯示全部';
+  document.getElementById('displayModeBtn').textContent = state.displayMode === 'all' ? t('btn_hide_done') : (state.lang==='zh'?'顯示全部':'Show All');
   renderDisplay();
 }
 setInterval(() => {
-  if (document.getElementById('tab-display').classList.contains('active')) {
+  if (document.getElementById('tab-display') && document.getElementById('tab-display').classList.contains('active')) {
     renderDisplay();
   }
 }, 15000);
 
 // ============================================================
-// 學生繳交
+// Student submit flow
 // ============================================================
 function showStudentScan() {
   document.getElementById('studentView').classList.add('hidden');
@@ -635,22 +1093,21 @@ function showStudentScan() {
   updateStudentClassSelect();
   switchMainTab('submit');
 }
+
 async function studentManualLogin() {
   const classId = document.getElementById('studentClassSelect').value;
   const sid = parseInt(document.getElementById('studentIdInput').value);
-  if (!classId || !sid) { alert('請選擇班級並輸入座號'); return; }
+  if (!classId || !sid) { alert(t('msg_select_class_and_seat')); return; }
   await loadStudentView(null, parseInt(classId), sid);
 }
+
 async function loadStudentView(token, classId, studentId) {
   state.currentToken = token;
   state.currentClassId = classId;
   try {
-    // Find student by seat number
     const { data: student } = await sb.from('students').select('*').eq('class_id', classId).eq('student_number', studentId).single();
-    if (!student) throw new Error('查無此學生');
-    // Get assignments with subject names
+    if (!student) throw new Error(t('msg_student_not_found'));
     const { data: assignments } = await sb.from('assignments').select('*, subjects(name)').eq('class_id', classId);
-    // Get submissions for this student
     const { data: submissions } = await sb.from('submissions').select('*').eq('student_id', student.id);
     const subs = submissions || [];
     const today = todayStr();
@@ -681,48 +1138,37 @@ async function loadStudentView(token, classId, studentId) {
         note
       };
     });
-    document.getElementById('studentName').textContent = student.name || ('座號 ' + studentId);
+    document.getElementById('studentName').textContent = student.name || ('Seat ' + studentId);
     const total = list.length;
     const submitted = list.filter(a => a.status === 'submitted' || a.status === 'corrected' || a.status === 'late').length;
-    document.getElementById('studentClass').textContent = total + ' 份作業（已完成 ' + submitted + ' 份）';
+    document.getElementById('studentClass').textContent = total + ' ' + (state.lang==='zh'?'份作業（已完成 ':'assignments (done ') + submitted + (state.lang==='zh'?' 份）':' )');
     document.getElementById('studentView').classList.remove('hidden');
     document.getElementById('studentEmpty').classList.add('hidden');
     const el = document.getElementById('studentAssignments');
     if (!list.length) {
-      el.innerHTML = '<div class="retro-card p-4 text-center text-retro-ink/50 font-serif text-sm">目前沒有作業</div>';
+      el.innerHTML = '<div class="retro-card p-4 text-center text-retro-ink/50 font-serif text-sm">' + t('msg_no_homework') + '</div>';
     } else {
-      el.innerHTML = list.map(a => `
-        <div class="student-card retro-card p-3 ${statusClass(a.status)}" onclick="handleStudentSubmit(${a.assignmentId}, ${student.id}, '${a.status}', ${a.locked})">
-          <div class="flex justify-between items-start">
-            <div>
-              <div class="font-bold font-serif text-sm">${a.subjectName ? '[' + a.subjectName + '] ' : ''}${a.title}</div>
-              ${a.description ? '<div class="text-xs text-retro-ink/50 font-serif">' + a.description + '</div>' : ''}
-              <div class="text-xs text-retro-ink/40 font-serif">截止: ${a.dueDate || '無'}</div>
-            </div>
-            <div class="text-right">
-              <div class="font-bold text-sm">${statusLabel(a.status)}</div>
-              ${a.submittedAt ? '<div class="text-xs text-retro-ink/40 font-serif">' + a.submittedAt + '</div>' : ''}
-              ${a.locked ? '<div class="text-xs text-red-600">🔒</div>' : ''}
-              ${a.note ? '<div class="text-xs text-orange-600 font-serif">📝 ' + a.note + '</div>' : ''}
-            </div>
-          </div>
-        </div>
-      `).join('');
+      el.innerHTML = list.map(a => {
+        const onclick = ' onclick="handleStudentSubmit(' + a.assignmentId + ',' + student.id + ','' + a.status + '',' + a.locked + ')"';
+        return '<div class="student-card retro-card p-3 ' + statusClass(a.status) + '"' + onclick + '><div class="flex justify-between items-start"><div><div class="font-bold font-serif text-sm">' + (a.subjectName ? '[' + a.subjectName + '] ' : '') + a.title + '</div>' + (a.description ? '<div class="text-xs text-retro-ink/50 font-serif">' + a.description + '</div>' : '') + '<div class="text-xs text-retro-ink/40 font-serif">' + (state.lang==='zh'?'截止:':'Due:') + ' ' + (a.dueDate || '—') + '</div></div><div class="text-right"><div class="font-bold text-sm">' + statusLabel(a.status) + '</div>' + (a.submittedAt ? '<div class="text-xs text-retro-ink/40 font-serif">' + a.submittedAt + '</div>' : '') + (a.locked ? '<div class="text-xs text-red-600">🔒</div>' : '') + (a.note ? '<div class="text-xs text-orange-600 font-serif">📝 ' + a.note + '</div>' : '') + '</div></div></div>';
+      }).join('');
     }
     switchMainTab('submit');
     playAudio('welcome');
-  } catch (e) { alert('載入失敗：' + e.message); }
+  } catch (e) { alert(t('msg_reload_failed') + e.message); }
 }
+
 async function handleStudentSubmit(aid, sid, status, locked) {
   if ((status === 'submitted' || status === 'late' || status === 'corrected') && locked) {
-    showModal('🔒 已鎖定', '<p class="font-serif text-sm">已繳且鎖定，請找老師解鎖</p>'); return;
+    showModal('🔒 ' + t('msg_locked'), '<p class="font-serif text-sm">' + t('msg_locked') + '</p>'); return;
   }
   if (status === 'needs_correction') {
-    showModal('📝 訂正完成？', '<p class="font-serif text-sm mb-2">你已完成訂正了嗎？</p><button onclick="doStudentCorrected(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ 已完成訂正</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">還未完成</button>');
+    showModal('📝 ' + t('msg_corrected_done'), '<p class="font-serif text-sm mb-2">' + (state.lang==='zh'?'你已完成訂正了嗎？':'Have you finished correction?') + '</p><button onclick="doStudentCorrected(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ ' + (state.lang==='zh'?'已完成訂正':'Finished') + '</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">' + (state.lang==='zh'?'還未完成':'Not yet') + '</button>');
     return;
   }
-  showModal('📝 確認繳交', '<p class="font-serif text-sm mb-2">確認繳交此作業？</p><button onclick="doStudentSubmit(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ 確認繳交</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">取消</button>');
+  showModal('📝 ' + t('msg_confirm_submit'), '<p class="font-serif text-sm mb-2">' + t('msg_confirm_submit') + '</p><button onclick="doStudentSubmit(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ ' + t('btn_confirm') + '</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">' + t('btn_cancel') + '</button>');
 }
+
 async function doStudentSubmit(aid, sid) {
   closeModal();
   try {
@@ -730,7 +1176,7 @@ async function doStudentSubmit(aid, sid) {
     const isLate = assignment && assignment.due_date && assignment.due_date < todayStr();
     const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', aid).eq('student_id', sid).single();
     if (existing) {
-      if (existing.locked) throw new Error('此作業已繳交且被鎖定，如需重繳請找老師解鎖');
+      if (existing.locked) throw new Error(t('msg_locked'));
       await sb.from('submissions').update({ status: isLate ? 'late' : 'submitted', submitted_at: nowStr(), locked: true }).eq('id', existing.id);
     } else {
       await sb.from('submissions').insert({ assignment_id: aid, student_id: sid, status: isLate ? 'late' : 'submitted', submitted_at: nowStr(), locked: true });
@@ -739,12 +1185,13 @@ async function doStudentSubmit(aid, sid) {
     const classId = state.currentClassId;
     const { data: student } = await sb.from('students').select('*').eq('id', sid).single();
     if (classId && student) await loadStudentView(state.currentToken, classId, student.student_number);
-    showModal('✅ 繳交成功！', `<p class="font-serif text-center">${isLate ? '⚠️ 已標記為遲交' : '✅ 繳交成功！'}</p>`);
+    showModal('✅ ' + t('msg_submit_success'), '<p class="font-serif text-center">' + (isLate ? '⚠️ ' + t('msg_late_marked') : '✅ ' + t('msg_submit_success')) + '</p>');
   } catch (e) {
     playAudio('error');
-    showModal('⚠️ 失敗', `<p class="font-serif text-sm">${e.message}</p>`);
+    showModal('⚠️ ' + t('voice_error'), '<p class="font-serif text-sm">' + e.message + '</p>');
   }
 }
+
 async function doStudentCorrected(aid, sid) {
   closeModal();
   try {
@@ -754,12 +1201,12 @@ async function doStudentCorrected(aid, sid) {
     const classId = state.currentClassId;
     const { data: student } = await sb.from('students').select('*').eq('id', sid).single();
     if (classId && student) await loadStudentView(state.currentToken, classId, student.student_number);
-    showModal('✔️ 訂正完成！', '<p class="font-serif text-center text-sm">訂正已記錄。</p>');
-  } catch (e) { alert('操作失敗：' + e.message); }
+    showModal('✔️ ' + t('msg_corrected_done'), '<p class="font-serif text-center text-sm">' + t('msg_corrected_recorded') + '</p>');
+  } catch (e) { alert(t('msg_operation_failed') + e.message); }
 }
 
 // ============================================================
-// 報表
+// Export & Print
 // ============================================================
 async function exportCSV() {
   try {
@@ -774,9 +1221,10 @@ async function exportCSV() {
       subs = data || [];
     }
     const c = state.classes.find(x => x.id === cid);
-    let csv = '\ufeff座號,姓名';
+    let csv = '﻿' + (state.lang==='zh'?'座號':'Seat') + ',' + (state.lang==='zh'?'姓名':'Name');
     (assignments || []).forEach(a => { csv += ',' + a.title; });
-    csv += ',完成率\n';
+    csv += ',' + (state.lang==='zh'?'完成率':'Completion') + '
+';
     (students || []).forEach(s => {
       csv += s.student_number + ',' + s.name;
       let done = 0;
@@ -786,7 +1234,8 @@ async function exportCSV() {
         csv += ',' + (ok ? '✓' : '');
         if (ok) done++;
       });
-      csv += ',' + Math.round(done / (assignments.length || 1) * 100) + '%\n';
+      csv += ',' + Math.round(done / (assignments.length || 1) * 100) + '%
+';
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -795,44 +1244,72 @@ async function exportCSV() {
     link.click();
   } catch (e) { alert(e.message); }
 }
+
 function printClass() {
   const c = state.classes.find(x => x.id === state.currentClassId);
-  document.getElementById('printArea').innerHTML = `<div style="text-align:center;margin-bottom:15px;"><h1 style="font-size:20px;font-weight:bold;">${c ? c.name : ''} 繳交紀錄</h1><p style="color:#666;font-size:12px;">${todayStr()}</p></div>
-  <table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f0e6d2;"><th style="border:1px solid #2c2c2c;padding:6px;">座號</th><th style="border:1px solid #2c2c2c;padding:6px;">姓名</th>${state.assignments.slice(0,5).map(a => `<th style="border:1px solid #2c2c2c;padding:6px;">${a.title}</th>`).join('')}</tr></thead><tbody>${state.students.sort((a,b)=>a.student_number-b.student_number).map(s => `<tr><td style="border:1px solid #2c2c2c;padding:6px;text-align:center;">${s.student_number}</td><td style="border:1px solid #2c2c2c;padding:6px;">${s.name}</td>${state.assignments.slice(0,5).map(() => '<td style="border:1px solid #2c2c2c;padding:6px;text-align:center;"></td>').join('')}</tr>`).join('')}</tbody></table>`;
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = '<div style="text-align:center;margin-bottom:15px;"><h1 style="font-size:20px;font-weight:bold;">' + (c ? c.name : '') + ' ' + (state.lang==='zh'?'繳交紀錄':'Submissions') + '</h1><p style="color:#666;font-size:12px;">' + todayStr() + '</p></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f0e6d2;"><th style="border:1px solid #2c2c2c;padding:6px;">' + (state.lang==='zh'?'座號':'#') + '</th><th style="border:1px solid #2c2c2c;padding:6px;">' + (state.lang==='zh'?'姓名':'Name') + '</th>' + state.assignments.slice(0,5).map(a => '<th style="border:1px solid #2c2c2c;padding:6px;">' + a.title + '</th>').join('') + '</tr></thead><tbody>' + state.students.sort((a,b)=>a.student_number-b.student_number).map(s => '<tr><td style="border:1px solid #2c2c2c;padding:6px;text-align:center;">' + s.student_number + '</td><td style="border:1px solid #2c2c2c;padding:6px;">' + s.name + '</td>' + state.assignments.slice(0,5).map(() => '<td style="border:1px solid #2c2c2c;padding:6px;text-align:center;"></td>').join('') + '</tr>').join('') + '</tbody></table>';
   window.print();
 }
+
 function printContactBook() {
   const c = state.classes.find(x => x.id === state.currentClassId);
-  const today = new Date().toLocaleDateString('zh-TW');
-  document.getElementById('printArea').innerHTML = state.students.sort((a,b)=>a.student_number-b.student_number).map(s => {
+  const today = new Date().toLocaleDateString(state.lang==='zh'?'zh-TW':'en-US');
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = state.students.sort((a,b)=>a.student_number-b.student_number).map(s => {
     const pendingItems = state.assignments.filter(a => {
       const sub = state.submissions.find(x => x.assignment_id === a.id && x.student_id === s.id);
       return !sub || sub.status === 'needs_correction';
     });
     const missingItems = state.assignments.filter(a => a.due_date && a.due_date < todayStr() && !state.submissions.find(x => x.assignment_id === a.id && x.student_id === s.id && (x.status === 'submitted' || x.status === 'late' || x.status === 'corrected')));
-    return `<div style="border:1px dashed #2c2c2c;padding:8px;margin-bottom:8px;page-break-inside:avoid;font-size:12px;"><div style="font-weight:bold;">${c ? c.name : ''} — ${s.name}（${s.student_number}）</div><div style="color:#666;font-size:10px;">${today}</div>
-    ${pendingItems.length ? '<div style="margin-top:4px;color:#c0392b;">⚠️ ' + pendingItems.map(a => a.title).join('、') + '</div>' : ''}
-    ${missingItems.length ? '<div style="margin-top:2px;color:#c0392b;">❌ ' + missingItems.map(a => a.title).join('、') + '</div>' : ''}
-    ${!pendingItems.length && !missingItems.length ? '<div style="margin-top:4px;color:#27ae60;">✅ 全部完成</div>' : ''}
-    <div style="margin-top:4px;border-top:1px solid #ddd;padding-top:4px;color:#999;font-size:10px;">家長簽名：______________</div></div>`;
+    return '<div style="border:1px dashed #2c2c2c;padding:8px;margin-bottom:8px;page-break-inside:avoid;font-size:12px;"><div style="font-weight:bold;">' + (c ? c.name : '') + ' — ' + s.name + '（' + s.student_number + '）</div><div style="color:#666;font-size:10px;">' + today + '</div>' +
+      (pendingItems.length ? '<div style="margin-top:4px;color:#c0392b;">⚠️ ' + pendingItems.map(a => a.title).join('、') + '</div>' : '') +
+      (missingItems.length ? '<div style="margin-top:2px;color:#c0392b;">❌ ' + missingItems.map(a => a.title).join('、') + '</div>' : '') +
+      (!pendingItems.length && !missingItems.length ? '<div style="margin-top:4px;color:#27ae60;">✅ ' + (state.lang==='zh'?'全部完成':'All done') + '</div>' : '') +
+      '<div style="margin-top:4px;border-top:1px solid #ddd;padding-top:4px;color:#999;font-size:10px;">' + (state.lang==='zh'?'家長簽名':'Parent sign') + '：______________</div></div>';
   }).join('');
   window.print();
 }
 
 // ============================================================
-// 語音
+// Voice settings
 // ============================================================
+function openSettings() {
+  const s = state.voiceSettings;
+  document.getElementById('settingVoiceEnabled').checked = !!s.enabled;
+  document.getElementById('settingVoiceLang').value = s.lang || 'zh-TW';
+  document.getElementById('settingVoiceRate').value = s.rate || 1.2;
+  document.getElementById('rateValue').textContent = s.rate || 1.2;
+  document.getElementById('settingVoiceSpeakName').checked = !!s.speakName;
+  document.getElementById('settingsModal').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+function saveVoiceSettings() {
+  state.voiceSettings = {
+    enabled: document.getElementById('settingVoiceEnabled').checked,
+    lang: document.getElementById('settingVoiceLang').value,
+    rate: parseFloat(document.getElementById('settingVoiceRate').value),
+    speakName: document.getElementById('settingVoiceSpeakName').checked
+  };
+  localStorage.setItem('voice_settings', JSON.stringify(state.voiceSettings));
+}
+
 function playAudio(type) {
   if (!window.speechSynthesis) return;
-  const msgs = { welcome: '歡迎使用', success: '繳交成功', error: '無法繳交' };
-  const msg = new SpeechSynthesisUtterance(msgs[type] || '');
-  msg.lang = 'zh-TW'; msg.rate = 1.2;
+  const s = state.voiceSettings;
+  if (!s.enabled) return;
+  const msg = new SpeechSynthesisUtterance(t('voice_' + type, type));
+  msg.lang = s.lang || 'zh-TW';
+  msg.rate = s.rate || 1.2;
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
 // ============================================================
-// Modal + 建立班級
+// Modal system
 // ============================================================
 let modalCallback = null;
 function showModal(title, body, callback) {
@@ -841,45 +1318,63 @@ function showModal(title, body, callback) {
   document.getElementById('modal').classList.add('active');
   modalCallback = callback || null;
 }
-function closeModal() { document.getElementById('modal').classList.remove('active'); modalCallback = null; }
-function showCreateClass() {
-  showModal('建立班級', `<input id="newClassName" placeholder="班級名稱（如：三年一班）" class="retro-input w-full p-2 rounded font-serif text-sm"><button onclick="doCreateClass()" class="btn bg-[#c0392b] text-white px-3 py-1 rounded font-serif text-sm mt-2 w-full">建立</button>`);
-}
-async function doCreateClass() {
-  const name = document.getElementById('newClassName').value.trim();
-  if (!name) return;
-  const { error } = await sb.from('classes').insert([{ name, teacher_name: state.teacherName }]);
-  if (error) { alert(error.message); return; }
-  await loadClasses();
-  closeModal();
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  modalCallback = null;
 }
 
 // ============================================================
-// Hash 路由（學生 QR Code 掃碼）
+// Hash routing (QR scan)
 // ============================================================
 function handleHash() {
   const hash = location.hash.slice(1) || '/';
   if (hash.startsWith('/student/')) {
     const token = hash.split('/')[2];
     if (token) studentScanLogin(token);
+  } else if (hash.startsWith('/assignment/')) {
+    const aid = hash.split('/')[2];
+    if (aid) assignmentScanLogin(aid);
   }
 }
 window.addEventListener('hashchange', handleHash);
+
 async function studentScanLogin(token) {
   try {
     const { data: student } = await sb.from('students').select('*, classes(id, name)').eq('qr_token', token).single();
     if (student) await loadStudentView(token, student.class_id, student.student_number);
-  } catch (e) { alert('掃碼無效：' + e.message); }
+  } catch (e) { alert(t('msg_scan_invalid') + e.message); }
+}
+
+async function assignmentScanLogin(aid) {
+  alert('Assignment QR scanned: ' + aid + '. In assignment mode, all students scan same QR. Please select your class and seat number to submit.');
 }
 
 // ============================================================
-// 啟動
+// Offline fallback (inline Service Worker)
+// ============================================================
+if ('serviceWorker' in navigator) {
+  const swCode = `self.addEventListener('install', e => { self.skipWaiting(); }); self.addEventListener('activate', e => { e.waitUntil(clients.claim()); }); self.addEventListener('fetch', e => { e.respondWith(fetch(e.request).catch(() => caches.match(e.request))); });`;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).then(() => {
+    console.log('SW registered');
+  }).catch(err => console.error('SW error', err));
+}
+
+// ============================================================
+// Startup
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
+  applyI18n();
+  document.getElementById('qrModeSelect').value = state.qrMode;
   handleHash();
   if (state.teacherName) {
     document.getElementById('welcomeModal').classList.remove('active');
-    afterLogin();
+    if (state.role === 'student') {
+      enterStudentMode();
+    } else {
+      afterLogin();
+    }
   } else {
     document.getElementById('welcomeModal').classList.add('active');
   }
