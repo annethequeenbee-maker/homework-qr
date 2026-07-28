@@ -672,8 +672,7 @@ async function importStudents() {
   const result = document.getElementById('importResult');
   if (!input) { result.textContent = t('msg_please_enter_data'); return; }
   if (!state.currentClassId) { result.textContent = t('msg_please_create_class'); return; }
-  const lines = input.split('
-').filter(l => l.trim());
+  const lines = input.split('\n').filter(l => l.trim());
   const students = [];
   lines.forEach(line => {
     const m = line.trim().match(/^(\d+)[\s,，.]+(.+)$/);
