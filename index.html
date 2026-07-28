@@ -519,7 +519,6 @@ async function importStudents() {
     }
     result.innerHTML = msg;
     document.getElementById('studentInput').value = '';
-    document.getElementById('importPreview').classList.add('hidden');
     await loadClassData();
     renderStudents();
   } catch (e) { result.textContent = '❌ ' + e.message; }
@@ -1021,7 +1020,13 @@ window.addEventListener('hashchange', handleHash);
 async function studentScanLogin(token) {
   try {
     const { data: student } = await sb.from('students').select('*, classes(id, name)').eq('qr_token', token).single();
-    if (student) await loadStudentView(token, student.class_id, student.student_number);
+    if (student) {
+      state.currentScanStudent = student;
+      state.currentScanClassId = student.class_id;
+      document.getElementById('scanTokenInput').value = token;
+      await renderScanResult(student);
+      switchMainTab('submit');
+    }
   } catch (e) { alert('掃碼無效：' + e.message); }
 }
 
