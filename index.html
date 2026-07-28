@@ -79,7 +79,7 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
     </div>
   </div>
   <div class="flex items-center gap-2 shrink-0">
-    <div id="loginArea" class="flex gap-1">
+    <div id="loginArea" class="flex gap-1 items-center">
       <input id="teacherNameInput" type="text" placeholder="老師姓名" class="retro-input text-sm p-1 rounded w-24 font-serif" onkeydown="if(event.key==='Enter')teacherLogin()">
       <button onclick="teacherLogin()" class="btn bg-[#c0392b] text-white px-3 py-1 text-sm rounded font-bold font-serif">登入</button>
     </div>
@@ -88,7 +88,8 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
       <div id="classSelector" class="hidden">
         <select id="classSelectNav" onchange="switchClass(parseInt(this.value))" class="retro-input text-sm p-1 rounded font-serif"></select>
       </div>
-      <button onclick="teacherLogout()" class="tool-btn px-2 py-1 text-xs rounded font-serif">登出</button>
+      <button onclick="showSwitchTeacher()" class="tool-btn px-2 py-1 text-xs rounded font-serif" title="切換老師">👤</button>
+      <button onclick="teacherLogout()" class="tool-btn px-2 py-1 text-xs rounded font-serif" title="登出">×</button>
     </div>
   </div>
 </div>
@@ -133,7 +134,7 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
       <h3 class="font-bold font-serif mb-1" id="qrPreviewName"></h3>
       <div id="qrPreviewImg" class="flex justify-center mb-1"></div>
       <p class="text-xs text-retro-ink/60 font-serif">讓學生掃此 QR Code 繳交作業</p>
-      <button class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif mt-2" onclick="document.getElementById('qrCodePreview').classList.add('hidden')">關閉</button>
+      <button class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif mt-2" onclick="document.getElementById('qrCodePreview').classList.add('hidden'); document.getElementById('qrPreviewImg').innerHTML='';">關閉</button>
     </div>
   </div>
 </div>
@@ -277,10 +278,20 @@ function teacherLogin() {
   localStorage.setItem('teacher_name', name);
   afterLogin();
 }
+function showSwitchTeacher() {
+  document.getElementById('loginArea').classList.remove('hidden');
+  document.getElementById('loginArea').classList.add('flex');
+  document.getElementById('teacherArea').classList.add('hidden');
+  document.getElementById('teacherArea').classList.remove('flex');
+  document.getElementById('classSelector').classList.add('hidden');
+  document.getElementById('teacherNameInput').value = '';
+  document.getElementById('teacherNameInput').focus();
+}
 function teacherLogout() {
   state.teacherName = '';
   localStorage.removeItem('teacher_name');
-  location.reload();
+  localStorage.removeItem('last_class_id');
+  showSwitchTeacher();
 }
 async function afterLogin() {
   document.getElementById('loginArea').classList.add('hidden');
@@ -305,7 +316,9 @@ async function loadClasses() {
   sel.innerHTML = state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   document.getElementById('classSelector').classList.remove('hidden');
   if (state.classes.length > 0) {
-    await switchClass(state.classes[0].id);
+    const lastId = parseInt(localStorage.getItem('last_class_id') || '0');
+    const target = state.classes.find(c => c.id === lastId) ? lastId : state.classes[0].id;
+    await switchClass(target);
   } else {
     showCreateClass();
   }
@@ -313,6 +326,7 @@ async function loadClasses() {
 }
 async function switchClass(id) {
   state.currentClassId = id;
+  localStorage.setItem('last_class_id', id);
   document.getElementById('classSelectNav').value = id;
   await loadClassData();
   renderAllTabs();
@@ -402,7 +416,8 @@ function getQRUrl(token) {
   return token ? base + '#/student/' + token : base + '#/student';
 }
 function showQR(name, sid, token) {
-  document.getElementById('qrCodePreview').classList.remove('hidden');
+  const modal = document.getElementById('qrCodePreview');
+  modal.classList.remove('hidden');
   document.getElementById('qrPreviewName').textContent = name + ' (' + sid + ')';
   const preview = document.getElementById('qrPreviewImg');
   preview.innerHTML = '';
@@ -410,7 +425,7 @@ function showQR(name, sid, token) {
   if (typeof QRCode !== 'undefined') {
     new QRCode(preview, { text: url, width: 150, height: 150 });
   } else {
-    preview.innerHTML = '<div class="text-center text-retro-ink/50 font-serif text-xs">載入中...<br><span class="text-[10px]">' + url + '</span></div>';
+    preview.innerHTML = '<div class="text-center text-retro-ink/50 font-serif text-xs">QR Code 載入中...<br><span class="text-[10px]">' + url + '</span></div>';
   }
 }
 function printQRCodes() {
@@ -863,8 +878,8 @@ async function studentScanLogin(token) {
 window.addEventListener('DOMContentLoaded', () => {
   handleHash();
   if (state.teacherName) {
-    document.getElementById('welcomeName').value = state.teacherName;
-    welcomeLogin();
+    document.getElementById('welcomeModal').classList.remove('active');
+    afterLogin();
   } else {
     document.getElementById('welcomeModal').classList.add('active');
   }
