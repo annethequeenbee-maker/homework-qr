@@ -71,7 +71,7 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
       <span class="text-2xl font-black font-serif text-retro-ink tracking-widest hidden md:inline">作業繳交系統</span>
     </div>
     <div class="flex gap-1 overflow-x-auto retro-scrollbar" id="mainTabs">
-      <div class="nav-tab active" data-tab="submit" onclick="switchMainTab('submit')">🎒 繳交</div>
+      <div class="nav-tab active" data-tab="submit" onclick="switchMainTab('submit')">📷 掃描</div>
       <div class="nav-tab" data-tab="students" onclick="switchMainTab('students')">👥 學生</div>
       <div class="nav-tab" data-tab="subjects" onclick="switchMainTab('subjects')">📚 科目</div>
       <div class="nav-tab" data-tab="assignments" onclick="switchMainTab('assignments')">📝 作業</div>
@@ -99,37 +99,34 @@ body { background-color: #f0e6d2; background-image: linear-gradient(#e5dcc5 1px,
 
 <main class="max-w-6xl mx-auto p-3">
 
-<!-- ===== 繳交模式 ===== -->
+<!-- ===== 掃描繳交（老師用） ===== -->
 <div id="tab-submit" class="tab-content active">
-  <div class="retro-card p-3 mb-3">
-    <div class="flex items-center gap-2 flex-wrap mb-2">
-      <input id="studentTokenInput" placeholder="掃 QR Code 自動帶入，或手動輸入座號" class="retro-input flex-1 p-2 rounded-lg font-serif text-sm min-w-[200px]">
-      <select id="studentClassSelect" class="retro-input p-2 rounded-lg font-serif text-sm" onchange="renderSeatGrid()"><option value="">選擇班級</option></select>
-      <input id="studentIdInput" type="number" placeholder="座號" class="retro-input w-16 p-2 rounded-lg font-serif text-sm">
-      <button onclick="studentManualLogin()" class="btn bg-[#2980b9] text-white px-3 py-2 text-sm rounded font-bold font-serif">進入</button>
+  <div class="retro-card p-4 mb-3 text-center">
+    <div class="text-4xl mb-2">📷</div>
+    <h3 class="font-bold font-serif text-lg mb-2">掃描學生 QR Code</h3>
+    <p class="text-sm text-retro-ink/60 font-serif mb-3">學生拿著 QR Code 紙卡，老師用平板掃描後即可登記繳交</p>
+    <div class="flex gap-2 justify-center flex-wrap mb-3">
+      <input id="scanTokenInput" placeholder="貼上 QR Code 掃描結果，或輸入學生代碼" class="retro-input flex-1 min-w-[250px] p-2 rounded-lg font-serif text-sm" onkeydown="if(event.key==='Enter')teacherScanStudent()">
+      <button onclick="teacherScanStudent()" class="btn bg-[#2980b9] text-white px-4 py-2 text-sm rounded font-bold font-serif">🔍 查詢</button>
     </div>
-    <div class="flex gap-2 items-center">
-      <span class="text-sm font-serif text-retro-ink/60">或</span>
-      <button onclick="toggleSeatView()" class="btn bg-retro-paper px-3 py-1 text-sm rounded font-serif" id="seatToggleBtn">📋 顯示座位表</button>
+    <div class="text-xs text-retro-ink/50 font-serif">
+      💡 小技巧：也可以直接輸入「班級名稱 座號」例如：「三年一班 5」
     </div>
   </div>
-  <!-- 座位表 -->
-  <div id="seatGridView" class="hidden retro-card p-3 mb-3">
-    <h3 class="font-bold font-serif text-sm mb-2">📋 座位表 - 點選你的座位報到</h3>
-    <div id="seatGrid" class="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"></div>
-  </div>
-  <div id="studentView" class="hidden">
-    <div class="retro-card p-3 mb-3 flex justify-between items-center">
-      <div><span id="studentName" class="text-xl font-black font-serif"></span> <span id="studentClass" class="text-sm text-retro-ink/60 font-serif"></span></div>
-      <button onclick="showStudentScan()" class="tool-btn px-3 py-1 text-sm rounded font-serif">換學生</button>
+  <div id="scanResultView" class="hidden">
+    <div class="retro-card p-3 mb-3 flex justify-between items-center bg-[#e8f5e9]">
+      <div>
+        <span id="scanStudentName" class="text-xl font-black font-serif"></span>
+        <span id="scanStudentInfo" class="text-sm text-retro-ink/60 font-serif ml-2"></span>
+      </div>
+      <button onclick="clearScanResult()" class="tool-btn px-3 py-1 text-sm rounded font-serif">清除</button>
     </div>
-    <div id="studentAssignments" class="space-y-2"></div>
+    <div id="scanAssignments" class="space-y-2"></div>
   </div>
-  <div id="studentEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif">
-    <div class="text-4xl mb-2">📱</div>
-    <div class="font-bold mb-1">掃 QR Code 報到</div>
-    <div class="text-sm mb-2">用手機相機掃描你的 QR Code</div>
-    <div class="text-sm">或選擇班級 → 輸入座號 → 點「進入」</div>
+  <div id="scanEmpty" class="retro-card p-6 text-center text-retro-ink/50 font-serif">
+    <div class="text-4xl mb-2">📷</div>
+    <div class="font-bold mb-1">準備掃描</div>
+    <div class="text-sm">掃描學生 QR Code 後，這裡會顯示該生的作業繳交狀態</div>
   </div>
 </div>
 
@@ -259,7 +256,9 @@ let state = {
   currentToken: null,
   displayMode: 'all',
   qrMode: localStorage.getItem('qr_mode') || 'student',
-  voiceSettings: JSON.parse(localStorage.getItem('voice_settings') || '{"enabled":true,"lang":"zh-TW","rate":1.2,"speakName":false}')
+  voiceSettings: JSON.parse(localStorage.getItem('voice_settings') || '{"enabled":true,"lang":"zh-TW","rate":1.2,"speakName":false}'),
+  currentScanStudent: null,
+  currentScanClassId: null
 };
 
 // ============================================================
@@ -331,24 +330,17 @@ async function afterLogin() {
 // 班級管理
 // ============================================================
 async function loadClasses() {
-  // Try exact match first, then fallback to all classes if none found
-  let { data, error } = await sb.from('classes').select('*').eq('teacher_name', state.teacherName).order('id');
+  // STRICT: Only show classes belonging to this teacher
+  const { data, error } = await sb.from('classes').select('*').eq('teacher_name', state.teacherName).order('id');
   if (error) throw error;
-  // If no exact match, try case-insensitive
-  if (!data || data.length === 0) {
-    const { data: allData } = await sb.from('classes').select('*').order('id');
-    if (allData && allData.length > 0) {
-      // Use all classes as fallback (for testing/demo purposes)
-      data = allData;
-    }
-  }
   state.classes = data || [];
   const sel = document.getElementById('classSelectNav');
   sel.innerHTML = state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   document.getElementById('classSelector').classList.remove('hidden');
   if (state.classes.length > 0) {
     const lastId = parseInt(localStorage.getItem('last_class_id') || '0');
-    const target = state.classes.find(c => c.id === lastId) ? lastId : state.classes[0].id;
+    const lastBelongs = state.classes.find(c => c.id === lastId);
+    const target = lastBelongs ? lastId : state.classes[0].id;
     await switchClass(target);
   } else {
     showCreateClass();
@@ -387,6 +379,7 @@ function renderAllTabs() {
 }
 async function updateStudentClassSelect() {
   const sel = document.getElementById('studentClassSelect');
+  if (!sel) return;
   // If no classes loaded yet, fetch all classes publicly
   if (!state.classes.length) {
     try {
@@ -751,184 +744,171 @@ setInterval(() => {
 }, 15000);
 
 // ============================================================
-// 學生繳交
+// 老師掃描繳交
 // ============================================================
-async function showStudentScan() {
-  document.getElementById('studentView').classList.add('hidden');
-  document.getElementById('studentEmpty').classList.remove('hidden');
-  document.getElementById('seatGridView').classList.add('hidden');
-  await updateStudentClassSelect();
-  switchMainTab('submit');
-}
-
-function toggleSeatView() {
-  const el = document.getElementById('seatGridView');
-  if (el.classList.contains('hidden')) {
-    el.classList.remove('hidden');
-    document.getElementById('seatToggleBtn').textContent = '📋 隱藏座位表';
-    renderSeatGrid();
-  } else {
-    el.classList.add('hidden');
-    document.getElementById('seatToggleBtn').textContent = '📋 顯示座位表';
-  }
-}
-
-async function renderSeatGrid() {
-  const classId = document.getElementById('studentClassSelect').value;
-  const grid = document.getElementById('seatGrid');
-  if (!classId) {
-    grid.innerHTML = '<div class="col-span-full text-center text-retro-ink/50 font-serif text-sm">請先選擇班級</div>';
-    return;
-  }
-  // Load students for this class
-  const { data: students } = await sb.from('students').select('*').eq('class_id', classId).order('student_number');
-  const stuMap = {};
-  (students || []).forEach(s => { stuMap[s.student_number] = s; });
-  // Generate seat grid (1-40)
-  let html = '';
-  for (let i = 1; i <= 40; i++) {
-    const s = stuMap[i];
-    if (s) {
-      html += `<div class="student-card retro-card p-2 text-center cursor-pointer hover:bg-white" onclick="seatLogin(${classId}, ${i})">
-        <div class="font-black text-lg">${i}</div>
-        <div class="text-xs font-serif">${s.name}</div>
-      </div>`;
-    } else {
-      html += `<div class="retro-card p-2 text-center opacity-40">
-        <div class="font-black text-lg text-retro-ink/30">${i}</div>
-        <div class="text-xs font-serif text-retro-ink/30">-</div>
-      </div>`;
+function parseScanInput(input) {
+  input = input.trim();
+  // Try to extract token from URL like ...#/student/TOKEN
+  const urlMatch = input.match(/#\/student\/(\w+)/);
+  if (urlMatch) return { type: 'token', token: urlMatch[1] };
+  // Try direct token (alphanumeric string)
+  if (/^[a-zA-Z0-9_-]+$/.test(input) && input.length >= 4) return { type: 'token', token: input };
+  // Try "className seatNumber" format
+  const parts = input.split(/\s+/);
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1];
+    const num = parseInt(last);
+    if (!isNaN(num)) {
+      const className = parts.slice(0, -1).join(' ');
+      return { type: 'classSeat', className, seatNumber: num };
     }
   }
-  grid.innerHTML = html;
+  return { type: 'unknown' };
 }
 
-async function seatLogin(classId, seatNum) {
-  document.getElementById('studentIdInput').value = seatNum;
-  await loadStudentView(null, parseInt(classId), seatNum);
-}
-
-async function studentManualLogin() {
-  const classId = document.getElementById('studentClassSelect').value;
-  const sid = parseInt(document.getElementById('studentIdInput').value);
-  if (!classId || !sid) { alert('請選擇班級並輸入座號'); return; }
-  await loadStudentView(null, parseInt(classId), sid);
-}
-async function loadStudentView(token, classId, studentId) {
-  state.currentToken = token;
-  state.currentClassId = classId;
+async function teacherScanStudent() {
+  const input = document.getElementById('scanTokenInput').value;
+  if (!input) { alert('請輸入或掃描學生 QR Code'); return; }
+  
+  const parsed = parseScanInput(input);
+  let student = null;
+  let classData = null;
+  
   try {
-    // Find student by seat number
-    const { data: student } = await sb.from('students').select('*').eq('class_id', classId).eq('student_number', studentId).single();
-    if (!student) throw new Error('查無此學生');
-    // Get assignments with subject names
-    const { data: assignments } = await sb.from('assignments').select('*, subjects(name)').eq('class_id', classId);
-    // Get submissions for this student
-    const { data: submissions } = await sb.from('submissions').select('*').eq('student_id', student.id);
-    const subs = submissions || [];
-    const today = todayStr();
-    const list = (assignments || []).map(a => {
-      const sub = subs.find(x => x.assignment_id === a.id);
-      const isPastDue = a.due_date && a.due_date < today;
-      let status = 'pending';
-      let submittedAt = null;
-      let locked = false;
-      let note = '';
-      if (sub) {
-        submittedAt = sub.submitted_at;
-        locked = sub.locked;
-        note = sub.note || '';
-        status = sub.status;
-      } else if (isPastDue) {
-        status = 'missing';
-      }
-      return {
-        assignmentId: a.id,
-        subjectName: a.subjects ? a.subjects.name : '',
-        title: a.title,
-        dueDate: a.due_date,
-        description: a.description,
-        status,
-        submittedAt,
-        locked,
-        note
-      };
-    });
-    document.getElementById('studentName').textContent = student.name || ('座號 ' + studentId);
-    const total = list.length;
-    const submitted = list.filter(a => a.status === 'submitted' || a.status === 'corrected' || a.status === 'late').length;
-    document.getElementById('studentClass').textContent = total + ' 份作業（已完成 ' + submitted + ' 份）';
-    document.getElementById('studentView').classList.remove('hidden');
-    document.getElementById('studentEmpty').classList.add('hidden');
-    const el = document.getElementById('studentAssignments');
-    if (!list.length) {
-      el.innerHTML = '<div class="retro-card p-4 text-center text-retro-ink/50 font-serif text-sm">目前沒有作業</div>';
+    if (parsed.type === 'token') {
+      // Find by qr_token
+      const { data } = await sb.from('students').select('*, classes(name, teacher_name)').eq('qr_token', parsed.token).single();
+      student = data;
+      if (student) classData = student.classes;
+    } else if (parsed.type === 'classSeat') {
+      // Find by class name + seat number
+      const { data: cls } = await sb.from('classes').select('*').eq('name', parsed.className).eq('teacher_name', state.teacherName).single();
+      if (!cls) throw new Error('找不到班級「' + parsed.className + '」');
+      classData = cls;
+      const { data: stu } = await sb.from('students').select('*').eq('class_id', cls.id).eq('student_number', parsed.seatNumber).single();
+      student = stu;
     } else {
-      el.innerHTML = list.map(a => `
-        <div class="student-card retro-card p-3 ${statusClass(a.status)}" onclick="handleStudentSubmit(${a.assignmentId}, ${student.id}, '${a.status}', ${a.locked})">
-          <div class="flex justify-between items-start">
-            <div>
-              <div class="font-bold font-serif text-sm">${a.subjectName ? '[' + a.subjectName + '] ' : ''}${a.title}</div>
-              ${a.description ? '<div class="text-xs text-retro-ink/50 font-serif">' + a.description + '</div>' : ''}
-              <div class="text-xs text-retro-ink/40 font-serif">截止: ${a.dueDate || '無'}</div>
-            </div>
-            <div class="text-right">
-              <div class="font-bold text-sm">${statusLabel(a.status)}</div>
-              ${a.submittedAt ? '<div class="text-xs text-retro-ink/40 font-serif">' + a.submittedAt + '</div>' : ''}
-              ${a.locked ? '<div class="text-xs text-red-600">🔒</div>' : ''}
-              ${a.note ? '<div class="text-xs text-orange-600 font-serif">📝 ' + a.note + '</div>' : ''}
-            </div>
-          </div>
-        </div>
-      `).join('');
+      throw new Error('無法辨識輸入格式');
     }
-    switchMainTab('submit');
-    playAudio('welcome');
-  } catch (e) { alert('載入失敗：' + e.message); }
-}
-async function handleStudentSubmit(aid, sid, status, locked) {
-  if ((status === 'submitted' || status === 'late' || status === 'corrected') && locked) {
-    showModal('🔒 已鎖定', '<p class="font-serif text-sm">已繳且鎖定，請找老師解鎖</p>'); return;
+    
+    if (!student) throw new Error('找不到此學生');
+    if (classData && classData.teacher_name !== state.teacherName) {
+      throw new Error('此學生不屬於您的班級');
+    }
+    
+    state.currentScanStudent = student;
+    state.currentScanClassId = student.class_id;
+    await renderScanResult(student);
+    playAudio('success');
+  } catch (e) {
+    alert('查詢失敗：' + e.message);
+    playAudio('error');
   }
-  if (status === 'needs_correction') {
-    showModal('📝 訂正完成？', '<p class="font-serif text-sm mb-2">你已完成訂正了嗎？</p><button onclick="doStudentCorrected(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ 已完成訂正</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">還未完成</button>');
+}
+
+async function renderScanResult(student) {
+  // Get class name
+  const { data: cls } = await sb.from('classes').select('name').eq('id', student.class_id).single();
+  const className = cls ? cls.name : '';
+  
+  document.getElementById('scanStudentName').textContent = student.name || ('座號 ' + student.student_number);
+  document.getElementById('scanStudentInfo').textContent = `${className} 座號${student.student_number}`;
+  document.getElementById('scanResultView').classList.remove('hidden');
+  document.getElementById('scanEmpty').classList.add('hidden');
+  
+  // Get assignments and submissions
+  const { data: assignments } = await sb.from('assignments').select('*, subjects(name)').eq('class_id', student.class_id);
+  const { data: submissions } = await sb.from('submissions').select('*').eq('student_id', student.id);
+  const subs = submissions || [];
+  const today = todayStr();
+  
+  const list = (assignments || []).map(a => {
+    const sub = subs.find(x => x.assignment_id === a.id);
+    const isPastDue = a.due_date && a.due_date < today;
+    let status = 'pending';
+    let submittedAt = null;
+    let note = '';
+    if (sub) {
+      submittedAt = sub.submitted_at;
+      note = sub.note || '';
+      status = sub.status;
+    } else if (isPastDue) {
+      status = 'missing';
+    }
+    return { assignmentId: a.id, subjectName: a.subjects ? a.subjects.name : '', title: a.title, dueDate: a.due_date, status, submittedAt, note };
+  });
+  
+  const el = document.getElementById('scanAssignments');
+  if (!list.length) {
+    el.innerHTML = '<div class="retro-card p-4 text-center text-retro-ink/50 font-serif text-sm">目前沒有作業</div>';
     return;
   }
-  showModal('📝 確認繳交', '<p class="font-serif text-sm mb-2">確認繳交此作業？</p><button onclick="doStudentSubmit(' + aid + ',' + sid + ')" class="btn bg-[#27ae60] text-white px-4 py-2 rounded font-serif w-full mb-1 text-sm">✅ 確認繳交</button><button onclick="closeModal()" class="btn bg-retro-paper px-4 py-2 rounded font-serif w-full text-sm">取消</button>');
+  
+  el.innerHTML = list.map(a => `
+    <div class="student-card retro-card p-3 ${statusClass(a.status)}">
+      <div class="flex justify-between items-start">
+        <div class="flex-1">
+          <div class="font-bold font-serif text-sm">${a.subjectName ? '[' + a.subjectName + '] ' : ''}${a.title}</div>
+          <div class="text-xs text-retro-ink/40 font-serif">截止: ${a.dueDate || '無'}</div>
+          ${a.submittedAt ? '<div class="text-xs text-green-600 font-serif">✓ ' + a.submittedAt + '</div>' : ''}
+          ${a.note ? '<div class="text-xs text-orange-600 font-serif">📝 ' + a.note + '</div>' : ''}
+        </div>
+        <div class="text-right ml-2">
+          <div class="font-bold text-sm mb-1">${statusLabel(a.status)}</div>
+          ${a.status === 'pending' || a.status === 'missing' ? `<button onclick="teacherMarkSubmit(${a.assignmentId}, ${student.id})" class="btn bg-[#27ae60] text-white px-2 py-1 text-xs rounded font-serif">✅ 已繳</button>` : ''}
+          ${a.status === 'pending' ? `<button onclick="teacherMarkMissing(${a.assignmentId}, ${student.id})" class="btn bg-[#e74c3c] text-white px-2 py-1 text-xs rounded font-serif ml-1">❌ 缺交</button>` : ''}
+          ${a.status === 'submitted' || a.status === 'late' ? `<button onclick="teacherMarkNeedsCorrection(${a.assignmentId}, ${student.id})" class="btn bg-[#f39c12] text-white px-2 py-1 text-xs rounded font-serif ml-1">📝 訂正</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
 }
-async function doStudentSubmit(aid, sid) {
-  closeModal();
+
+function clearScanResult() {
+  state.currentScanStudent = null;
+  state.currentScanClassId = null;
+  document.getElementById('scanTokenInput').value = '';
+  document.getElementById('scanResultView').classList.add('hidden');
+  document.getElementById('scanEmpty').classList.remove('hidden');
+}
+
+async function teacherMarkSubmit(aid, sid) {
   try {
     const { data: assignment } = await sb.from('assignments').select('*').eq('id', aid).single();
     const isLate = assignment && assignment.due_date && assignment.due_date < todayStr();
     const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', aid).eq('student_id', sid).single();
     if (existing) {
-      if (existing.locked) throw new Error('此作業已繳交且被鎖定，如需重繳請找老師解鎖');
       await sb.from('submissions').update({ status: isLate ? 'late' : 'submitted', submitted_at: nowStr(), locked: true }).eq('id', existing.id);
     } else {
       await sb.from('submissions').insert({ assignment_id: aid, student_id: sid, status: isLate ? 'late' : 'submitted', submitted_at: nowStr(), locked: true });
     }
     playAudio('success');
-    const classId = state.currentClassId;
-    const { data: student } = await sb.from('students').select('*').eq('id', sid).single();
-    if (classId && student) await loadStudentView(state.currentToken, classId, student.student_number);
-    showModal('✅ 繳交成功！', `<p class="font-serif text-center">${isLate ? '⚠️ 已標記為遲交' : '✅ 繳交成功！'}</p>`);
-  } catch (e) {
-    playAudio('error');
-    showModal('⚠️ 失敗', `<p class="font-serif text-sm">${e.message}</p>`);
-  }
+    if (state.currentScanStudent) await renderScanResult(state.currentScanStudent);
+  } catch (e) { alert('記錄失敗：' + e.message); playAudio('error'); }
 }
-async function doStudentCorrected(aid, sid) {
-  closeModal();
+
+async function teacherMarkMissing(aid, sid) {
   try {
     const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', aid).eq('student_id', sid).single();
-    if (existing) await sb.from('submissions').update({ status: 'corrected' }).eq('id', existing.id);
+    if (existing) {
+      await sb.from('submissions').update({ status: 'missing', submitted_at: null }).eq('id', existing.id);
+    } else {
+      await sb.from('submissions').insert({ assignment_id: aid, student_id: sid, status: 'missing' });
+    }
     playAudio('success');
-    const classId = state.currentClassId;
-    const { data: student } = await sb.from('students').select('*').eq('id', sid).single();
-    if (classId && student) await loadStudentView(state.currentToken, classId, student.student_number);
-    showModal('✔️ 訂正完成！', '<p class="font-serif text-center text-sm">訂正已記錄。</p>');
-  } catch (e) { alert('操作失敗：' + e.message); }
+    if (state.currentScanStudent) await renderScanResult(state.currentScanStudent);
+  } catch (e) { alert('記錄失敗：' + e.message); playAudio('error'); }
+}
+
+async function teacherMarkNeedsCorrection(aid, sid) {
+  try {
+    const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', aid).eq('student_id', sid).single();
+    if (existing) {
+      await sb.from('submissions').update({ status: 'needs_correction', note: '需訂正' }).eq('id', existing.id);
+    }
+    playAudio('success');
+    if (state.currentScanStudent) await renderScanResult(state.currentScanStudent);
+  } catch (e) { alert('記錄失敗：' + e.message); playAudio('error'); }
 }
 
 // ============================================================
