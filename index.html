@@ -116,6 +116,11 @@ tr:hover { background: #f9f9f9; }
 .student-btn { position: relative; }
 .student-btn.batch-selected { box-shadow: 0 0 0 3px #1d4e89; }
 
+/* ===== 繳交時間顯示（在姓名下方） ===== */
+.student-btn .name-with-time { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.student-btn .name-text { font-size: 0.95em; }
+.student-btn .submit-time-inline { font-size: 0.6em; color: rgba(0,0,0,0.6); margin-top: 2px; }
+
 /* ===== Toast 提示 ===== */
 #toast-container { position: fixed; top: 80px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
 .toast { background: #fff; border-left: 5px solid; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); min-width: 200px; animation: toastSlide 0.3s ease; font-size: 0.95em; display: flex; align-items: center; gap: 10px; }
@@ -160,18 +165,24 @@ tr:hover { background: #f9f9f9; }
 
 <!-- ===== Tab 導航 ===== -->
 <nav class="tab-nav no-print" id="mainTabs">
-  <button class="tab-btn active" data-tab="submit" onclick="switchTab('submit')">📋 繳交</button>
+  <button class="tab-btn active" data-tab="assignment-a" onclick="switchTab('assignment-a')">📋 作業 A</button>
+  <button class="tab-btn" data-tab="assignment-b" onclick="switchTab('assignment-b')">📋 作業 B</button>
   <button class="tab-btn" data-tab="correction" onclick="switchTab('correction')">📝 訂正</button>
-  <button class="tab-btn" onclick="openSettingsModal()">⚙️ 設定</button>
   <button class="tab-btn" data-tab="report" onclick="switchTab('report')">📊 報表</button>
+  <button class="tab-btn" onclick="openSettingsModal()">⚙️ 設定</button>
 </nav>
 
 <!-- ===== 登入畫面 ===== -->
 <div id="loginScreen" class="container" style="text-align:center; padding: 50px 20px;">
   <div style="font-size: 3em; margin-bottom: 15px;">📋</div>
   <h2 style="color: #1d4e89; margin-bottom: 10px;">作業繳交系統</h2>
-  <p style="color: #666; margin-bottom: 25px;">請輸入您的姓名開始使用</p>
-  <input id="loginName" type="text" placeholder="例如：王老師" style="width: 250px; margin-bottom: 15px; text-align: center;" onkeydown="if(event.key==='Enter')doLogin()">
+  <p style="color: #666; margin-bottom: 15px;">請選擇或輸入您的姓名開始使用</p>
+  <div style="margin-bottom: 12px;">
+    <select id="teacherHistorySelect" onchange="if(this.value){document.getElementById('loginName').value=this.value;}" style="width: 250px; margin-bottom: 10px;">
+      <option value="">-- 選擇老師 --</option>
+    </select>
+  </div>
+  <input id="loginName" type="text" placeholder="或輸入新老師姓名" style="width: 250px; margin-bottom: 15px; text-align: center;" onkeydown="if(event.key==='Enter')doLogin()">
   <br>
   <button onclick="doLogin()" class="btn btn-darkblue" style="font-size: 1.1em; padding: 12px 40px;">開始使用</button>
 </div>
@@ -179,9 +190,8 @@ tr:hover { background: #f9f9f9; }
 <!-- ===== 主內容區（登入後顯示） ===== -->
 <div id="mainContent" class="hidden">
 
-<!-- 📋 繳交頁面 -->
-<div id="tab-submit" class="tab-panel active">
-  <!-- 作業 A -->
+<!-- 📋 作業 A 頁面 -->
+<div id="tab-assignment-a" class="tab-panel active">
   <div class="container">
     <div class="section-title">📋 作業繳交 A</div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
@@ -197,7 +207,7 @@ tr:hover { background: #f9f9f9; }
       <div class="legend-item"><div class="legend-box status-corrected"></div> 已訂正</div>
       <div class="legend-item"><div class="legend-box status-late"></div> 遲交</div>
     </div>
-    <div id="batchHint" class="hidden" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em;">
+    <div id="batchHintA" class="hidden" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em;">
       📌 批量模式：勾選要標記的學生，然後用下方按鈕批量操作
     </div>
     <div id="submitStudentGridA" class="student-grid"></div>
@@ -207,15 +217,25 @@ tr:hover { background: #f9f9f9; }
     </div>
   </div>
 
-  <!-- 分隔線 -->
-  <div style="border-top: 3px dashed #1d4e89; margin: 20px 0;"></div>
+  <!-- 批量操作浮動欄 A -->
+  <div id="batchBarA" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+    <span style="align-self: center; font-weight: bold;">已選 <span id="batchCountA">0</span> 人</span>
+    <button onclick="batchMark('submitted')" class="btn btn-green" style="padding: 8px 20px;">✅ 批量已繳</button>
+    <button onclick="batchMark('missing')" class="btn btn-red" style="padding: 8px 20px;">❌ 批量缺交</button>
+    <button onclick="batchMark('pending')" class="btn btn-gray" style="padding: 8px 20px;">○ 批量未繳</button>
+    <button onclick="clearBatchSelection()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">清除選擇</button>
+    <button onclick="toggleBatchMode()" class="btn" style="background: rgba(255,255,255,0.2); color: #fff; padding: 8px 20px;">退出批量</button>
+  </div>
+</div>
 
-  <!-- 作業 B -->
+<!-- 📋 作業 B 頁面 -->
+<div id="tab-assignment-b" class="tab-panel">
   <div class="container">
     <div class="section-title">📋 作業繳交 B</div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
       <label>選擇作業：</label>
       <select id="submitAssignmentSelectB" onchange="loadSubmitViewB()" style="min-width: 200px;"><option value="">-- 請選擇作業 --</option></select>
+      <button onclick="toggleBatchMode()" class="btn btn-gray" id="batchModeBtnB" style="padding: 8px 15px;">☐ 批量模式</button>
     </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-box status-pending"></div> 未繳交</div>
@@ -225,6 +245,9 @@ tr:hover { background: #f9f9f9; }
       <div class="legend-item"><div class="legend-box status-corrected"></div> 已訂正</div>
       <div class="legend-item"><div class="legend-box status-late"></div> 遲交</div>
     </div>
+    <div id="batchHintB" class="hidden" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em;">
+      📌 批量模式：勾選要標記的學生，然後用下方按鈕批量操作
+    </div>
     <div id="submitStudentGridB" class="student-grid"></div>
     <div id="submitEmptyB" class="hidden" style="text-align: center; color: #999; padding: 40px;">
       <div style="font-size: 2em; margin-bottom: 10px;">👆</div>
@@ -232,9 +255,9 @@ tr:hover { background: #f9f9f9; }
     </div>
   </div>
 
-  <!-- 批量操作浮動欄 -->
-  <div id="batchBar" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
-    <span style="align-self: center; font-weight: bold;">已選 <span id="batchCount">0</span> 人</span>
+  <!-- 批量操作浮動欄 B -->
+  <div id="batchBarB" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; background: #1d4e89; color: #fff; padding: 12px 20px; display: flex; justify-content: center; gap: 15px; z-index: 150; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+    <span style="align-self: center; font-weight: bold;">已選 <span id="batchCountB">0</span> 人</span>
     <button onclick="batchMark('submitted')" class="btn btn-green" style="padding: 8px 20px;">✅ 批量已繳</button>
     <button onclick="batchMark('missing')" class="btn btn-red" style="padding: 8px 20px;">❌ 批量缺交</button>
     <button onclick="batchMark('pending')" class="btn btn-gray" style="padding: 8px 20px;">○ 批量未繳</button>
@@ -359,6 +382,8 @@ let state = {
   assignments: [],
   submissions: [],
   currentAssignmentId: null,
+  currentAssignmentSlot: 'A',
+  activeOptionStudent: null,
   batchMode: false,
   batchSelected: new Set()
 };
@@ -402,19 +427,39 @@ function showToast(message, type) {
 // ============================================================
 // 登入 / 登出
 // ============================================================
+function getTeacherHistory() {
+  try { return JSON.parse(localStorage.getItem('teacher_history') || '[]'); } catch (e) { return []; }
+}
+function saveTeacherHistory(name) {
+  const hist = getTeacherHistory().filter(n => n !== name);
+  hist.unshift(name);
+  localStorage.setItem('teacher_history', JSON.stringify(hist.slice(0, 5)));
+}
+function renderTeacherHistory() {
+  const sel = document.getElementById('teacherHistorySelect');
+  if (!sel) return;
+  const hist = getTeacherHistory();
+  sel.innerHTML = '<option value="">歷史記錄</option>' + hist.map(n => `<option value="${n}">${n}</option>`).join('');
+}
 function doLogin() {
   const name = document.getElementById('loginName').value.trim();
   if (!name) { alert('請輸入姓名'); return; }
   state.teacherName = name;
   localStorage.setItem('teacher_name', name);
+  saveTeacherHistory(name);
+  renderTeacherHistory();
   initApp();
 }
 function switchTeacher() {
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('mainContent').classList.add('hidden');
-  document.getElementById('mainTabs').classList.add('hidden');
-  document.getElementById('loginName').value = '';
-  document.getElementById('loginName').focus();
+  const ls = document.getElementById('loginScreen');
+  const mc = document.getElementById('mainContent');
+  const mt = document.getElementById('mainTabs');
+  if(ls) ls.classList.remove('hidden');
+  if(mc) mc.classList.add('hidden');
+  if(mt) mt.classList.add('hidden');
+  const ln = document.getElementById('loginName');
+  if(ln) { ln.value = ''; ln.focus(); }
+  renderTeacherHistory();
 }
 function logout() {
   state.teacherName = '';
@@ -427,10 +472,14 @@ function logout() {
 // 初始化
 // ============================================================
 async function initApp() {
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('mainContent').classList.remove('hidden');
-  document.getElementById('mainTabs').classList.remove('hidden');
-  document.getElementById('teacherDisplay').textContent = state.teacherName + ' 老師';
+  const ls = document.getElementById('loginScreen');
+  const mc = document.getElementById('mainContent');
+  const mt = document.getElementById('mainTabs');
+  const td = document.getElementById('teacherDisplay');
+  if(ls) ls.classList.add('hidden');
+  if(mc) mc.classList.remove('hidden');
+  if(mt) mt.classList.remove('hidden');
+  if(td) td.textContent = state.teacherName + ' 老師';
   try {
     await loadClasses();
   } catch (e) {
@@ -486,22 +535,34 @@ async function loadClassData() {
 // ============================================================
 function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+  const tp = document.getElementById('tab-' + tab);
+  if(tp) tp.classList.add('active');
   document.querySelectorAll('#mainTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  if (tab === 'submit') {
-    // Auto-reload both assignments if previously selected
+  if (tab === 'assignment-a') {
+    state.currentAssignmentSlot = 'A';
+    state.activeOptionStudent = null;
+    state.batchSelected.clear();
+    updateBatchUI();
     const aidA = document.getElementById('submitAssignmentSelectA').value;
-    if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    if (aidA) { state.currentAssignmentId = parseInt(aidA); renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA'); }
+  }
+  if (tab === 'assignment-b') {
+    state.currentAssignmentSlot = 'B';
+    state.activeOptionStudent = null;
+    state.batchSelected.clear();
+    updateBatchUI();
     const aidB = document.getElementById('submitAssignmentSelectB').value;
-    if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+    if (aidB) { state.currentAssignmentId = parseInt(aidB); renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB'); }
   }
   if (tab === 'correction') renderCorrection();
   if (tab === 'report') renderReport();
   if (tab === 'settings') renderSettings();
+  updateBatchUI();
 }
 function switchSubTab(subtab) {
   document.querySelectorAll('.subtab-panel').forEach(el => el.classList.remove('active'));
-  document.getElementById('subtab-' + subtab).classList.add('active');
+  const sp = document.getElementById('subtab-' + subtab);
+  if(sp) sp.classList.add('active');
   document.querySelectorAll('[data-subtab]').forEach(b => b.classList.toggle('active', b.dataset.subtab === subtab));
 }
 
@@ -547,7 +608,8 @@ async function importStudents() {
     let msg = '✅ 匯入 ' + (data ? data.length : students.length) + ' 人';
     if (errors.length > 0) msg += '（' + errors.length + ' 行未匯入）';
     result.textContent = msg;
-    document.getElementById('studentInput').value = '';
+    const stIn = document.getElementById('studentInput');
+    if(stIn) stIn.value = '';
     await loadClassData();
     renderSettings();
   } catch (e) { result.textContent = '❌ ' + e.message; }
@@ -633,7 +695,8 @@ async function createSubject() {
   if (!name || !state.currentClassId) return;
   const { error } = await sb.from('subjects').insert([{ class_id: state.currentClassId, name }]);
   if (error) { alert(error.message); return; }
-  document.getElementById('subjectInput').value = '';
+  const si = document.getElementById('subjectInput');
+  if(si) si.value = '';
   await loadClassData();
   renderSettings();
 }
@@ -646,7 +709,10 @@ async function createAssignment() {
     class_id: state.currentClassId, subject_id: subjectId || null, title, due_date: dueDate || null
   }]);
   if (error) { alert(error.message); return; }
-  document.getElementById('hwTitle').value = ''; document.getElementById('hwDueDate').value = '';
+  const ht = document.getElementById('hwTitle');
+  const hd = document.getElementById('hwDueDate');
+  if(ht) ht.value = '';
+  if(hd) hd.value = '';
   await loadClassData();
   renderSettings();
 }
@@ -718,11 +784,16 @@ async function loadSubmitViewA() {
   const aid = parseInt(document.getElementById('submitAssignmentSelectA').value);
   if (!aid) return;
   state.currentAssignmentId = aid;
+  state.currentAssignmentSlot = 'A';
+  state.activeOptionStudent = null;
   await renderSubmitGrid(aid, 'submitStudentGridA', 'submitEmptyA');
 }
 async function loadSubmitViewB() {
   const aid = parseInt(document.getElementById('submitAssignmentSelectB').value);
   if (!aid) return;
+  state.currentAssignmentId = aid;
+  state.currentAssignmentSlot = 'B';
+  state.activeOptionStudent = null;
   await renderSubmitGrid(aid, 'submitStudentGridB', 'submitEmptyB');
 }
 async function renderSubmitGrid(aid, gridId, emptyId) {
@@ -734,20 +805,31 @@ async function renderSubmitGrid(aid, gridId, emptyId) {
   const assignment = state.assignments.find(a => a.id === aid);
   const isPastDue = assignment && assignment.due_date && assignment.due_date < today;
   const grid = document.getElementById(gridId);
-  document.getElementById(emptyId).classList.add('hidden');
+  const emptyEl = document.getElementById(emptyId);
+  if(emptyEl) emptyEl.classList.add('hidden');
   grid.innerHTML = state.students.map(s => {
     const sub = subsMap[s.id];
     let status = 'pending';
-    if (sub) status = sub.status;
-    else if (isPastDue) status = 'missing';
+    let timeStr = '';
+    if (sub) {
+      status = sub.status;
+      if (sub.submitted_at) {
+        const parts = sub.submitted_at.split(' ');
+        if (parts.length === 2) timeStr = parts[0].slice(5) + ' ' + parts[1].slice(0,5);
+      }
+    } else if (isPastDue) status = 'missing';
     const icon = { submitted:'✅', missing:'❌', needs_correction:'📝', corrected:'✔️', pending:'○', late:'⚠️' }[status];
     const checked = state.batchSelected.has(s.id) ? 'checked' : '';
     const selectedClass = state.batchSelected.has(s.id) ? 'batch-selected' : '';
     const checkboxHtml = state.batchMode ? `<input type="checkbox" class="batch-check" data-sid="${s.id}" ${checked} onclick="event.stopPropagation();toggleBatchItem(${s.id})">` : '';
-    return `<div class="student-btn ${statusClass(status)} ${selectedClass}" onclick="onStudentClick(${s.id}, '${status}')">
+    const timeHtml = timeStr ? `<div class="submit-time-inline">${timeStr}</div>` : '';
+    return `<div id="stu-btn-${s.id}" class="student-btn ${statusClass(status)} ${selectedClass}" onclick="onStudentClick(${s.id}, '${status}')">
       ${checkboxHtml}
       <div class="seat">${s.student_number}</div>
-      <div class="name">${s.name}</div>
+      <div class="name-with-time">
+        <div class="name-text">${s.name}</div>
+        ${timeHtml}
+      </div>
       <div class="status-icon">${icon}</div>
     </div>`;
   }).join('');
@@ -757,10 +839,12 @@ function toggleBatchMode() {
   state.batchMode = !state.batchMode;
   state.batchSelected.clear();
   updateBatchUI();
-  // Reload grids to show/hide checkboxes
-  if (state.currentAssignmentId) {
+  // Reload the current grid to show/hide checkboxes
+  const slot = state.currentAssignmentSlot;
+  if (slot === 'A') {
     const aidA = document.getElementById('submitAssignmentSelectA').value;
     if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+  } else if (slot === 'B') {
     const aidB = document.getElementById('submitAssignmentSelectB').value;
     if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
   }
@@ -773,53 +857,70 @@ function toggleBatchItem(sid) {
 }
 
 function updateBatchUI() {
-  const btn = document.getElementById('batchModeBtn');
-  const bar = document.getElementById('batchBar');
-  const hint = document.getElementById('batchHint');
+  const btnA = document.getElementById('batchModeBtn');
+  const btnB = document.getElementById('batchModeBtnB');
+  const barA = document.getElementById('batchBarA');
+  const barB = document.getElementById('batchBarB');
+  const hintA = document.getElementById('batchHintA');
+  const hintB = document.getElementById('batchHintB');
+  const label = state.batchMode ? '☑ 批量模式開啟' : '☐ 批量模式';
+  const bg = state.batchMode ? '#1d4e89' : '';
+  const color = state.batchMode ? '#fff' : '';
+  if (btnA) { btnA.textContent = label; btnA.style.background = bg; btnA.style.color = color; }
+  if (btnB) { btnB.textContent = label; btnB.style.background = bg; btnB.style.color = color; }
+  // Show/hide bar and hint only on the active slot's tab
+  const isA = document.getElementById('tab-assignment-a')?.classList.contains('active');
+  const isB = document.getElementById('tab-assignment-b')?.classList.contains('active');
+  [barA, barB, hintA, hintB].forEach(el => { if (el) el.classList.add('hidden'); });
   if (state.batchMode) {
-    btn.textContent = '☑ 批量模式開啟';
-    btn.style.background = '#1d4e89';
-    btn.style.color = '#fff';
-    bar.classList.remove('hidden');
-    hint.classList.remove('hidden');
-  } else {
-    btn.textContent = '☐ 批量模式';
-    btn.style.background = '';
-    btn.style.color = '';
-    bar.classList.add('hidden');
-    hint.classList.add('hidden');
+    if (isA && barA) barA.classList.remove('hidden');
+    if (isA && hintA) hintA.classList.remove('hidden');
+    if (isB && barB) barB.classList.remove('hidden');
+    if (isB && hintB) hintB.classList.remove('hidden');
   }
-  document.getElementById('batchCount').textContent = state.batchSelected.size;
+  const countA = document.getElementById('batchCountA');
+  const countB = document.getElementById('batchCountB');
+  if (countA) countA.textContent = state.batchSelected.size;
+  if (countB) countB.textContent = state.batchSelected.size;
 }
 
 function clearBatchSelection() {
   state.batchSelected.clear();
+  state.activeOptionStudent = null;
   updateBatchUI();
-  if (state.currentAssignmentId) loadSubmitView();
+  const aidA = document.getElementById('submitAssignmentSelectA').value;
+  if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+  const aidB = document.getElementById('submitAssignmentSelectB').value;
+  if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
 }
 
 async function batchMark(newStatus) {
   if (state.batchSelected.size === 0) { alert('請先勾選學生'); return; }
   const sidList = Array.from(state.batchSelected);
+  const aid = state.currentAssignmentId;
+  if (!aid) { alert('請先選擇作業'); return; }
   try {
-    const isLate = state.assignments.find(a => a.id === state.currentAssignmentId)?.due_date < todayStr();
+    const isLate = state.assignments.find(a => a.id === aid)?.due_date < todayStr();
     const finalStatus = (newStatus === 'submitted' && isLate) ? 'late' : newStatus;
     // Process one by one
     let count = 0;
     for (const sid of sidList) {
-      const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', state.currentAssignmentId).eq('student_id', sid).single();
+      const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', aid).eq('student_id', sid).single();
       if (existing) {
-        await sb.from('submissions').update({ status: finalStatus, submitted_at: (finalStatus !== 'pending' && finalStatus !== 'missing') ? nowStr() : null, locked: (finalStatus === 'submitted' || finalStatus === 'late' || finalStatus === 'corrected') }).eq('id', existing.id);
+        await sb.from('submissions').update({ status: finalStatus, submitted_at: (finalStatus !== 'pending' && finalStatus !== 'missing') ? nowStr() : null }).eq('id', existing.id);
       } else if (finalStatus !== 'pending') {
-        await sb.from('submissions').insert({ assignment_id: state.currentAssignmentId, student_id: sid, status: finalStatus, submitted_at: nowStr(), locked: true });
+        await sb.from('submissions').insert({ assignment_id: aid, student_id: sid, status: finalStatus, submitted_at: nowStr() });
       }
       count++;
     }
-    alert('✅ 已批量標記 ' + count + ' 位學生為「' + statusLabel(finalStatus) + '」');
+    showToast('✅ 已批量標記 ' + count + ' 位學生為「' + statusLabel(finalStatus) + '」', 'success');
     state.batchSelected.clear();
     updateBatchUI();
-    await loadSubmitView();
-  } catch (e) { alert('批量操作失敗：' + e.message); }
+    const aidA = document.getElementById('submitAssignmentSelectA').value;
+    if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    const aidB = document.getElementById('submitAssignmentSelectB').value;
+    if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+  } catch (e) { showToast('批量操作失敗：' + e.message, 'error'); }
 }
 async function onStudentClick(sid, currentStatus) {
   // Batch mode: toggle checkbox
@@ -829,40 +930,46 @@ async function onStudentClick(sid, currentStatus) {
     if (checkbox) checkbox.checked = state.batchSelected.has(sid);
     return;
   }
-  // Normal mode: show action panel
   const student = state.students.find(s => s.id === sid);
-  const assignment = state.assignments.find(a => a.id === state.currentAssignmentId);
-  // Check for pending corrections
-  const { data: pendingCorrections } = await sb.from('submissions')
-    .select('*, assignments(title)')
-    .eq('student_id', sid)
-    .in('status', ['needs_correction', 'missing']);
-  let reminderHtml = '';
-  if (pendingCorrections && pendingCorrections.length > 0) {
-    reminderHtml = `<div class="alert alert-warning" style="margin-bottom:12px;">
-      <strong>⚠️ 提醒：</strong>此學生還有 ${pendingCorrections.length} 份作業尚未處理<br>
-      ${pendingCorrections.map(c => `• ${c.assignments ? c.assignments.title : '作業'}：${statusLabel(c.status)}`).join('<br>')}
-    </div>`;
+  if (!student) return;
+  // If another student's options are open, close it first by re-rendering
+  if (state.activeOptionStudent && state.activeOptionStudent !== sid) {
+    state.activeOptionStudent = null;
+    const slot = state.currentAssignmentSlot;
+    if (slot === 'A') {
+      const aidA = document.getElementById('submitAssignmentSelectA').value;
+      if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    } else if (slot === 'B') {
+      const aidB = document.getElementById('submitAssignmentSelectB').value;
+      if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+    }
   }
-  // Current status display
-  const currentLabel = statusLabel(currentStatus);
-  const currentTime = await getSubmissionTime(sid, state.currentAssignmentId);
-  showModal(student.name + '（' + student.student_number + '號）', `
-    <div style="text-align:center; margin-bottom:12px;">
-      <div style="font-size:1.1em; color:#666;">目前狀態：<span style="font-weight:bold; color:#1d4e89;">${currentLabel}</span></div>
-      ${currentTime ? '<div style="font-size:0.85em; color:#999; margin-top:4px;">時間：' + currentTime + '</div>' : ''}
+  // If currently pending or missing, first tap directly marks as submitted (auto late if past due)
+  if (currentStatus === 'pending' || currentStatus === 'missing') {
+    await doMark(sid, 'submitted');
+    return;
+  }
+  // Otherwise show inline 4-option panel on the button itself
+  showStudentOptions(sid);
+}
+
+function showStudentOptions(sid) {
+  const btn = document.getElementById('stu-btn-' + sid);
+  if (!btn) return;
+  state.activeOptionStudent = sid;
+  btn.className = 'student-btn';
+  btn.style.padding = '4px';
+  btn.style.display = 'flex';
+  btn.style.alignItems = 'center';
+  btn.style.justifyContent = 'center';
+  btn.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;height:100%;">
+      <button onclick="event.stopPropagation();doMark(${sid}, 'submitted')" class="action-btn action-submitted" style="padding:0;font-size:0.75em;min-height:unset;">✅</button>
+      <button onclick="event.stopPropagation();doMark(${sid}, 'missing')" class="action-btn action-missing" style="padding:0;font-size:0.75em;min-height:unset;">❌</button>
+      <button onclick="event.stopPropagation();doMark(${sid}, 'late')" class="action-btn action-late" style="padding:0;font-size:0.75em;min-height:unset;">⚠️</button>
+      <button onclick="event.stopPropagation();doMark(${sid}, 'needs_correction')" class="action-btn action-correction" style="padding:0;font-size:0.75em;min-height:unset;">📝</button>
     </div>
-    ${reminderHtml}
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">
-      <button onclick="doMark(${sid}, 'submitted')" class="action-btn action-submitted">✅ 已繳交</button>
-      <button onclick="doMark(${sid}, 'missing')" class="action-btn action-missing">❌ 缺交</button>
-      <button onclick="doMark(${sid}, 'needs_correction')" class="action-btn action-correction">📝 待訂正</button>
-      <button onclick="doMark(${sid}, 'late')" class="action-btn action-late">⚠️ 遲交</button>
-    </div>
-    <div style="text-align:center;">
-      <button onclick="doMark(${sid}, 'pending')" class="action-btn action-pending" style="width:50%;">○ 改為未繳</button>
-    </div>
-  `);
+  `;
 }
 async function getSubmissionTime(sid, aid) {
   try {
@@ -871,7 +978,7 @@ async function getSubmissionTime(sid, aid) {
   } catch (e) { return null; }
 }
 async function doMark(sid, newStatus) {
-  closeModal();
+  state.activeOptionStudent = null;
   try {
     const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', state.currentAssignmentId).eq('student_id', sid).single();
     const isLate = state.assignments.find(a => a.id === state.currentAssignmentId)?.due_date < todayStr();
@@ -886,8 +993,11 @@ async function doMark(sid, newStatus) {
     const student = state.students.find(s => s.id === sid);
     const timeStr = now.split(' ')[1];
     showToast(student.name + ' ' + statusLabel(finalStatus) + '（' + timeStr + '）', 'success');
-    // Reload and refresh
-    await loadSubmitView();
+    // Reload both grids
+    const aidA = document.getElementById('submitAssignmentSelectA').value;
+    if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    const aidB = document.getElementById('submitAssignmentSelectB').value;
+    if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
   } catch (e) { 
     showToast('操作失敗：' + e.message, 'error'); 
   }
@@ -910,11 +1020,13 @@ async function renderCorrection() {
   
   // Render uncorrected
   const uEl = document.getElementById('uncorrectedList');
+  const uEmpty = document.getElementById('uncorrectedEmpty');
   if (!uncorrected.length) {
-    uEl.innerHTML = ''; document.getElementById('uncorrectedEmpty').style.display = 'block';
+    if(uEl) uEl.innerHTML = '';
+    if(uEmpty) uEmpty.style.display = 'block';
   } else {
-    document.getElementById('uncorrectedEmpty').style.display = 'none';
-    uEl.innerHTML = uncorrected.map(s => {
+    if(uEmpty) uEmpty.style.display = 'none';
+    if(uEl) uEl.innerHTML = uncorrected.map(s => {
       const stu = s.students || {};
       const assign = s.assignments || {};
       return `<div class="student-list-item">
@@ -932,11 +1044,13 @@ async function renderCorrection() {
   
   // Render late
   const lEl = document.getElementById('lateList');
+  const lEmpty = document.getElementById('lateEmpty');
   if (!late.length) {
-    lEl.innerHTML = ''; document.getElementById('lateEmpty').style.display = 'block';
+    if(lEl) lEl.innerHTML = '';
+    if(lEmpty) lEmpty.style.display = 'block';
   } else {
-    document.getElementById('lateEmpty').style.display = 'none';
-    lEl.innerHTML = late.map(s => {
+    if(lEmpty) lEmpty.style.display = 'none';
+    if(lEl) lEl.innerHTML = late.map(s => {
       const stu = s.students || {};
       const assign = s.assignments || {};
       return `<div class="student-list-item">
@@ -956,11 +1070,13 @@ async function renderCorrection() {
   
   // Render missing
   const mEl = document.getElementById('missingList');
+  const mEmpty = document.getElementById('missingEmpty');
   if (!missing.length) {
-    mEl.innerHTML = ''; document.getElementById('missingEmpty').style.display = 'block';
+    if(mEl) mEl.innerHTML = '';
+    if(mEmpty) mEmpty.style.display = 'block';
   } else {
-    document.getElementById('missingEmpty').style.display = 'none';
-    mEl.innerHTML = missing.map(s => {
+    if(mEmpty) mEmpty.style.display = 'none';
+    if(mEl) mEl.innerHTML = missing.map(s => {
       const stu = s.students || {};
       const assign = s.assignments || {};
       return `<div class="student-list-item">
@@ -979,11 +1095,13 @@ async function renderCorrection() {
   
   // Render corrected
   const cEl = document.getElementById('correctedList');
+  const cEmpty = document.getElementById('correctedEmpty');
   if (!corrected.length) {
-    cEl.innerHTML = ''; document.getElementById('correctedEmpty').style.display = 'block';
+    if(cEl) cEl.innerHTML = '';
+    if(cEmpty) cEmpty.style.display = 'block';
   } else {
-    document.getElementById('correctedEmpty').style.display = 'none';
-    cEl.innerHTML = corrected.map(s => {
+    if(cEmpty) cEmpty.style.display = 'none';
+    if(cEl) cEl.innerHTML = corrected.map(s => {
       const stu = s.students || {};
       const assign = s.assignments || {};
       return `<div class="student-list-item">
@@ -1045,7 +1163,8 @@ async function renderReport() {
     });
   });
   const total = submitted + missing + needsCorr + corrected + late + pending;
-  document.getElementById('reportStats').innerHTML = `
+  const rs = document.getElementById('reportStats');
+  if(rs) rs.innerHTML = `
     <div class="stat-card" style="background:#4caf50;"><div class="number">${submitted}</div><div class="label">已繳交</div></div>
     <div class="stat-card" style="background:#f44336;"><div class="number">${missing}</div><div class="label">缺交</div></div>
     <div class="stat-card" style="background:#ff9800;"><div class="number">${needsCorr}</div><div class="label">待訂正</div></div>
@@ -1078,7 +1197,8 @@ async function renderReport() {
     html += '<td>' + rate + '%</td></tr>';
   });
   html += '</tbody></table>';
-  document.getElementById('reportTable').innerHTML = html;
+  const rt = document.getElementById('reportTable');
+  if(rt) rt.innerHTML = html;
 }
 
 // ============================================================
@@ -1185,19 +1305,23 @@ async function syncToGoogleSheet() {
 // Modal
 // ============================================================
 function showModal(title, body) {
-  document.getElementById('modalTitle').textContent = title;
-  document.getElementById('modalBody').innerHTML = body;
-  document.getElementById('modalFooter').innerHTML = '';
-  document.getElementById('modalOverlay').classList.add('active');
+  const t = document.getElementById('modalTitle');
+  const b = document.getElementById('modalBody');
+  const f = document.getElementById('modalFooter');
+  const o = document.getElementById('modalOverlay');
+  if(t) t.textContent = title;
+  if(b) b.innerHTML = body;
+  if(f) f.innerHTML = '';
+  if(o) o.classList.add('active');
 }
-function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+function closeModal() { const o = document.getElementById('modalOverlay'); if(o) o.classList.remove('active'); }
 function openSettingsModal() {
   renderSettings();
   showModal('⚙️ 設定', `
     <div style="max-height:70vh;overflow-y:auto;padding-right:10px;">
       <!-- 字體選擇 -->
       <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
-        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">🎨 字體設定</div>
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;font-size:1em;">🎨 字體設定</div>
         <select id="fontSelector" onchange="changeFont(this.value)" style="width:100%;">
           <option value="'Microsoft JhengHei', Arial, sans-serif">微軟正黑體（預設）</option>
           <option value="'Noto Sans TC', sans-serif">Noto Sans TC</option>
@@ -1210,38 +1334,43 @@ function openSettingsModal() {
       </div>
       <!-- 學生管理 -->
       <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
-        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">👥 學生管理</div>
-        <p style="font-size:0.9em;color:#666;margin-bottom:8px;">每行輸入座號和姓名，不用空格也可以：</p>
-        <textarea id="studentInput" rows="5" placeholder="1王小明&#10;2陳小華&#10;3林小美" style="width:100%;margin-bottom:8px;"></textarea>
-        <div style="display:flex;gap:8px;">
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;font-size:1em;">👥 學生管理</div>
+        <p style="font-size:0.9em;color:#666;margin-bottom:8px;">每行輸入座號和姓名（不用空格也可以）</p>
+        <textarea id="studentInput" rows="4" placeholder="1王小明&#10;2陳小華&#10;3林小美" style="width:100%;margin-bottom:8px;"></textarea>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
           <button onclick="importStudents()" class="btn btn-blue" style="padding:6px 15px;font-size:0.85em;">匯入學生</button>
           <button onclick="document.getElementById('studentInput').value='';document.getElementById('importResult').textContent='';" class="btn btn-gray" style="padding:6px 15px;font-size:0.85em;">清除</button>
           <span id="importResult" style="align-self:center;color:#666;font-size:0.85em;"></span>
         </div>
-        <div id="studentList" style="margin-top:10px;max-height:150px;overflow-y:auto;"></div>
+        <div id="studentList" style="max-height:120px;overflow-y:auto;"></div>
       </div>
       <!-- 科目管理 -->
       <div style="margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0;">
-        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">📚 科目管理</div>
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;font-size:1em;">📚 科目管理</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <input id="subjectInput" placeholder="科目名稱（如：國語、數學）" style="flex:1;">
-          <button onclick="createSubject()" class="btn btn-green" style="padding:6px 15px;font-size:0.85em;">新增</button>
+          <button onclick="createSubject()" class="btn btn-green" style="padding:6px 15px;font-size:0.85em;">新增科目</button>
         </div>
         <div id="subjectList"></div>
       </div>
       <!-- 作業管理 -->
       <div>
-        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;">📝 作業管理</div>
+        <div style="font-weight:bold;color:#1d4e89;margin-bottom:8px;font-size:1em;">📝 作業管理</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <select id="hwSubject"><option value="">選擇科目</option></select>
           <input id="hwTitle" placeholder="作業名稱">
           <input id="hwDueDate" type="date" placeholder="截止日">
         </div>
         <button onclick="createAssignment()" class="btn btn-darkblue" style="padding:6px 15px;font-size:0.85em;">＋ 建立新作業</button>
-        <div id="assignmentList" style="margin-top:10px;max-height:200px;overflow-y:auto;"></div>
+        <div id="assignmentList" style="margin-top:10px;max-height:160px;overflow-y:auto;"></div>
       </div>
     </div>
   `);
+  // 設定科目預設值
+  setTimeout(() => {
+    const hwSub = document.getElementById('hwSubject');
+    if (hwSub && hwSub.options.length > 1) hwSub.selectedIndex = 1;
+  }, 50);
 }
 function changeFont(fontFamily) {
   document.body.style.fontFamily = fontFamily;
@@ -1271,15 +1400,18 @@ function showGASTutorial() {
 // 啟動
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
+  renderTeacherHistory();
   if (state.teacherName) {
     initApp();
   } else {
-    document.getElementById('mainTabs').classList.add('hidden');
+    const mt = document.getElementById('mainTabs');
+    if (mt) mt.classList.add('hidden');
   }
 });
 // Back to top
 window.addEventListener('scroll', () => {
-  document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
+  const btt = document.getElementById('backToTop');
+  if(btt) btt.style.display = window.scrollY > 300 ? 'block' : 'none';
 });
 
 // ============================================================
@@ -1287,8 +1419,10 @@ window.addEventListener('scroll', () => {
 // ============================================================
 function renderAll() {
   renderSettings();
-  if (document.getElementById('tab-correction').classList.contains('active')) renderCorrection();
-  if (document.getElementById('tab-report').classList.contains('active')) renderReport();
+  const tc = document.getElementById('tab-correction');
+  const tr = document.getElementById('tab-report');
+  if (tc && tc.classList.contains('active')) renderCorrection();
+  if (tr && tr.classList.contains('active')) renderReport();
 }
 </script>
 </body>
