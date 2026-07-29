@@ -1095,6 +1095,7 @@ function updateStudentBtn(sid, status, timeStr) {
   if (!btn) return;
   const icon = { submitted:'✅', missing:'❌', needs_correction:'📝', corrected:'✔️', pending:'○', late:'⚠️' }[status];
   btn.className = 'student-btn ' + statusClass(status);
+  btn.setAttribute('onclick', "onStudentClick(" + sid + ", '" + status + "')");
   if (state.batchSelected.has(sid)) btn.classList.add('batch-selected');
   const statusEl = btn.querySelector('.status-icon');
   const nameWrap = btn.querySelector('.name-with-time');
