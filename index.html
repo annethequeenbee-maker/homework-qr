@@ -1086,6 +1086,7 @@ async function doMark(sid, newStatus) {
     // Track today's change
     const student = state.students.find(s => s.id === sid);
     const assignment = state.assignments.find(a => a.id === state.currentAssignmentId);
+    if (!state.todayChanges) state.todayChanges = [];
     state.todayChanges.unshift({
       time: now.split(' ')[1],
       studentName: student ? student.name : '',
@@ -1097,8 +1098,9 @@ async function doMark(sid, newStatus) {
     // Show toast
     const timeStr = now.split(' ')[1];
     showToast(student.name + ' ' + statusLabel(finalStatus) + '（' + timeStr + '）', 'success');
-    // Update just this button in-place (fast, no Supabase re-query)
+    // Update button + today changes list
     updateStudentBtn(sid, finalStatus, timeStr);
+    renderTodayChanges();
   } catch (e) { 
     showToast('操作失敗：' + e.message, 'error'); 
   }
