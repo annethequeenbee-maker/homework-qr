@@ -1014,10 +1014,15 @@ async function batchMark(newStatus) {
     showToast('✅ 已批量標記 ' + count + ' 位學生為「' + statusLabel(finalStatus) + '」', 'success');
     state.batchSelected.clear();
     updateBatchUI();
-    const aidA = document.getElementById('submitAssignmentSelectA').value;
-    if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
-    const aidB = document.getElementById('submitAssignmentSelectB').value;
-    if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+    // Only reload the current slot's grid
+    const slot = state.currentAssignmentSlot;
+    if (slot === 'A') {
+      const aidA = document.getElementById('submitAssignmentSelectA').value;
+      if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+    } else if (slot === 'B') {
+      const aidB = document.getElementById('submitAssignmentSelectB').value;
+      if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+    }
   } catch (e) { showToast('批量操作失敗：' + e.message, 'error'); }
 }
 async function onStudentClick(sid, currentStatus) {
@@ -1065,13 +1070,29 @@ async function doMark(sid, newStatus) {
     // Show toast
     const timeStr = now.split(' ')[1];
     showToast(student.name + ' ' + statusLabel(finalStatus) + '（' + timeStr + '）', 'success');
-    // Reload both grids
-    const aidA = document.getElementById('submitAssignmentSelectA').value;
-    if (aidA) await renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
-    const aidB = document.getElementById('submitAssignmentSelectB').value;
-    if (aidB) await renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+    // Update just this button in-place (fast, no Supabase re-query)
+    updateStudentBtn(sid, finalStatus, timeStr);
   } catch (e) { 
     showToast('操作失敗：' + e.message, 'error'); 
+  }
+}
+function updateStudentBtn(sid, status, timeStr) {
+  const btn = document.getElementById('stu-btn-' + sid);
+  if (!btn) return;
+  const icon = { submitted:'✅', missing:'❌', needs_correction:'📝', corrected:'✔️', pending:'○', late:'⚠️' }[status];
+  btn.className = 'student-btn ' + statusClass(status);
+  if (state.batchSelected.has(sid)) btn.classList.add('batch-selected');
+  const statusEl = btn.querySelector('.status-icon');
+  const nameWrap = btn.querySelector('.name-with-time');
+  const timeEl = btn.querySelector('.submit-time-inline');
+  if (statusEl) statusEl.textContent = icon;
+  if (timeEl) {
+    timeEl.textContent = timeStr || '';
+  } else if (timeStr && nameWrap) {
+    const div = document.createElement('div');
+    div.className = 'submit-time-inline';
+    div.textContent = timeStr;
+    nameWrap.appendChild(div);
   }
 }
 
