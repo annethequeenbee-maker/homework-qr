@@ -1034,10 +1034,23 @@ async function onStudentClick(sid, currentStatus) {
     return;
   }
   // Cycle through statuses: submitted → missing → late → needs_correction → submitted
-  const cycle = ['submitted', 'missing', 'late', 'needs_correction'];
-  const idx = cycle.indexOf(currentStatus);
-  const nextStatus = idx === -1 ? 'submitted' : cycle[(idx + 1) % cycle.length];
-  await doMark(sid, nextStatus);
+  const student = state.students.find(s => s.id === sid);
+  if (!student) return;
+  // First tap: directly mark as submitted (auto late if past due)
+  if (currentStatus === 'pending' || currentStatus === 'missing') {
+    await doMark(sid, 'submitted');
+    return;
+  }
+  // Second tap: show options modal
+  showModal(student.name + '（' + student.student_number + '號）', `
+    <div style="text-align:center;margin-bottom:10px;color:#666;">目前狀態：<b>${statusLabel(currentStatus)}</b></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button onclick="doMark(${sid}, 'submitted')" class="action-btn action-submitted" style="padding:10px;">✅ 已繳交</button>
+      <button onclick="doMark(${sid}, 'missing')" class="action-btn action-missing" style="padding:10px;">❌ 缺交</button>
+      <button onclick="doMark(${sid}, 'late')" class="action-btn action-late" style="padding:10px;">⚠️ 遲交</button>
+      <button onclick="doMark(${sid}, 'needs_correction')" class="action-btn action-correction" style="padding:10px;">📝 待訂正</button>
+    </div>
+  `);
 }
 async function getSubmissionTime(sid, aid) {
   try {
@@ -1045,7 +1058,8 @@ async function getSubmissionTime(sid, aid) {
     return data ? data.submitted_at : null;
   } catch (e) { return null; }
 }
-async function doMark(sid, newStatus) {
+async function doMark(sid, newStatus) {
+  closeModal();
   try {
     const { data: existing } = await sb.from('submissions').select('*').eq('assignment_id', state.currentAssignmentId).eq('student_id', sid).single();
     const isLate = state.assignments.find(a => a.id === state.currentAssignmentId)?.due_date < todayStr();
