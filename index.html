@@ -7,7 +7,6 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>作業繳交系統</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; }
@@ -361,6 +360,19 @@ tr:hover { background: #f9f9f9; }
     </div>
   </div>
 
+  <!-- 強制資料清理 -->
+  <div class="container">
+    <div style="padding: 15px; background: #ffebee; border: 2px solid #f44336; border-radius: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-weight: bold; color: #c62828; font-size: 1em;">🧹 強制資料清理</div>
+          <div style="font-size: 0.85em; color: #666; margin-top: 4px;">刪除本班所有繳交紀錄，包含作業或學生已刪除後遺留的舊資料</div>
+        </div>
+        <button onclick="forceClearPrompt()" class="btn-red" style="padding: 10px 20px; font-size: 0.95em; font-weight: bold;">🗑️ 強制清除舊資料</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 資料匯出 -->
   <div class="container">
     <div class="section-title">☁️ 資料匯出</div>
@@ -425,6 +437,7 @@ let state = {
   todayChanges: [],
   reportAssignmentFilter: 'all'
 };
+let renderSubmitSeq = 0; // 防止切班級時舊的渲染覆蓋新資料
 
 // ============================================================
 // 工具函式
@@ -545,32 +558,50 @@ async function onClassChange(id) {
   if (!id) return;
   state.currentClassId = id;
   localStorage.setItem('last_class_id', id);
-  await loadClassData();
-  // Clear assignment grids and re-render everything
+  // 立即清空畫面，避免舊班級學生殘留
   const gridA = document.getElementById('submitStudentGridA');
   const gridB = document.getElementById('submitStudentGridB');
   if (gridA) gridA.innerHTML = '';
   if (gridB) gridB.innerHTML = '';
-  renderAll();
+  // 重置作業下拉選單與批量狀態
+  const selA = document.getElementById('submitAssignmentSelectA');
+  const selB = document.getElementById('submitAssignmentSelectB');
+  if (selA) selA.value = '';
+  if (selB) selB.value = '';
+  state.batchMode = false;
+  state.batchSelected.clear();
+  updateBatchUI();
+  // 更新 Header 顯示
   const cls = state.classes.find(c => c.id === id);
   const classDisplay = document.getElementById('currentClassDisplay');
+  if (cls && classDisplay) classDisplay.textContent = cls.name;
+
+  await loadClassData();
+  renderAll();
+
   if (cls && classDisplay) {
-    classDisplay.textContent = cls.name;
     showToast('已切換到「' + cls.name + '」(' + state.students.length + '人)', 'info');
   }
 }
 async function loadClassData() {
   const cid = state.currentClassId;
   if (!cid) return;
+  // 先清空舊資料，避免非同步過程中畫面閃到舊班級
+  state.students = [];
+  state.subjects = [];
+  state.assignments = [];
+  state.submissions = [];
   const [sRes, subRes, aRes] = await Promise.all([
     sb.from('students').select('*').eq('class_id', cid).order('student_number'),
     sb.from('subjects').select('*').eq('class_id', cid).order('id'),
     sb.from('assignments').select('*, subjects(name)').eq('class_id', cid).order('id', { ascending: false })
   ]);
+  if (sRes.error) throw sRes.error;
+  if (subRes.error) throw subRes.error;
+  if (aRes.error) throw aRes.error;
   state.students = sRes.data || [];
   state.subjects = subRes.data || [];
   state.assignments = aRes.data || [];
-  state.submissions = [];
 }
 
 // ============================================================
@@ -696,10 +727,11 @@ function renderSettings() {
         state.assignments.map(a => {
           const subName = a.subjects ? a.subjects.name : '';
           return `<tr><td>${subName || '-'}</td><td>${a.title}</td><td>${a.due_date || '無'}</td>
-            <td>
-              <button onclick="editAssignment(${a.id})" class="btn btn-blue" style="padding:3px 8px;font-size:0.75em;">✏️</button>
-              <button onclick="deleteAssignment(${a.id})" class="btn btn-red" style="padding:3px 8px;font-size:0.75em;">🗑️</button>
-            </td></tr>`;
+          <td>
+            <button onclick="editAssignment(${a.id})" class="btn btn-blue" style="padding:3px 8px;font-size:0.75em;">✏️</button>
+            <button onclick="copyAssignmentPrompt(${a.id})" class="btn btn-green" style="padding:3px 8px;font-size:0.75em;">📋</button>
+            <button onclick="deleteAssignment(${a.id})" class="btn btn-red" style="padding:3px 8px;font-size:0.75em;">🗑️</button>
+          </td></tr>`;
         }).join('') + '</tbody></table>';
     }
   }
@@ -861,6 +893,7 @@ async function deleteStudent(sid) {
     if (error) throw error;
     await loadClassData();
     renderSettings();
+    if (document.getElementById('tab-report')?.classList.contains('active')) renderReport();
     showToast('學生已刪除', 'success');
   } catch (e) { showToast('刪除失敗：' + e.message, 'error'); }
 }
@@ -876,8 +909,57 @@ async function deleteAssignment(aid) {
     if (error) throw error;
     await loadClassData();
     renderSettings();
+    if (document.getElementById('tab-report')?.classList.contains('active')) renderReport();
     showToast('作業已刪除', 'success');
   } catch (e) { showToast('刪除失敗：' + e.message, 'error'); }
+}
+
+// ============================================================
+// 複製作業到其他班級（科任老師需求）
+// ============================================================
+function copyAssignmentPrompt(aid) {
+  const a = state.assignments.find(x => x.id === aid);
+  if (!a) return;
+  const currentId = state.currentClassId;
+  const otherClasses = state.classes.filter(c => c.id !== currentId);
+  if (otherClasses.length === 0) {
+    showToast('沒有其他班級可以複製', 'warning');
+    return;
+  }
+  const checkboxes = otherClasses.map(c => `
+    <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e0e0e0;border-radius:6px;margin-bottom:6px;cursor:pointer;">
+      <input type="checkbox" class="copy-target-class" value="${c.id}" style="width:18px;height:18px;">
+      <span>${c.name}</span>
+    </label>
+  `).join('');
+  showModal('📋 複製作業「' + a.title + '」', `
+    <div style="margin-bottom:10px;color:#666;">請選擇要複製到的班級（不會複製繳交紀錄）：</div>
+    <div style="max-height:250px;overflow-y:auto;">${checkboxes}</div>
+    <button onclick="doCopyAssignment(${aid})" class="btn btn-darkblue" style="width:100%;margin-top:15px;">開始複製</button>
+  `);
+}
+async function doCopyAssignment(aid) {
+  const a = state.assignments.find(x => x.id === aid);
+  if (!a) return;
+  const inputs = document.querySelectorAll('.copy-target-class:checked');
+  const targetIds = Array.from(inputs).map(input => parseInt(input.value));
+  if (targetIds.length === 0) { showToast('請至少選擇一個班級', 'warning'); return; }
+  try {
+    const newAssignments = targetIds.map(cid => ({
+      class_id: cid,
+      subject_id: a.subject_id,
+      title: a.title,
+      due_date: a.due_date
+    }));
+    const { error } = await sb.from('assignments').insert(newAssignments);
+    if (error) throw error;
+    closeModal();
+    await loadClassData();
+    renderSettings();
+    showToast('已複製「' + a.title + '」到 ' + targetIds.length + ' 個班級', 'success');
+  } catch (e) {
+    showToast('複製失敗：' + e.message, 'error');
+  }
 }
 
 // ============================================================
@@ -898,20 +980,29 @@ async function loadSubmitViewB() {
   await renderSubmitGrid(aid, 'submitStudentGridB', 'submitEmptyB');
 }
 async function renderSubmitGrid(aid, gridId, emptyId) {
+  const seq = ++renderSubmitSeq;
   const grid = document.getElementById(gridId);
   const emptyEl = document.getElementById(emptyId);
   if (!grid) return;
+  // 防護：此作業必須屬於目前班級
+  const assignment = state.assignments.find(a => a.id === aid);
+  if (!assignment) {
+    grid.innerHTML = '';
+    if(emptyEl) emptyEl.classList.add('hidden');
+    return;
+  }
   if (!state.students.length) {
     grid.innerHTML = '';
     if(emptyEl) emptyEl.classList.remove('hidden');
     return;
   }
   const { data: subs } = await sb.from('submissions').select('*').eq('assignment_id', aid);
+  // 若已有更新的渲染被觸發，放棄本次結果
+  if (seq !== renderSubmitSeq) return;
   const subsMap = {};
   (subs || []).forEach(s => { subsMap[s.student_id] = s; });
   const today = todayStr();
-  const assignment = state.assignments.find(a => a.id === aid);
-  const isPastDue = assignment && assignment.due_date && assignment.due_date < today;
+  const isPastDue = assignment.due_date && assignment.due_date < today;
   if(emptyEl) emptyEl.classList.add('hidden');
   grid.innerHTML = state.students.map(s => {
     const sub = subsMap[s.id];
@@ -1288,17 +1379,54 @@ async function dailyReset() {
   if (!confirm('⚠️ 每日重置\n\n確定要清除「' + className + '」全部繳交紀錄嗎？\n\n所有學生的繳交狀態將回到「未繳」。')) return;
   if (!confirm('⚠️ 再次確認\n\n這個操作無法復原，確定要重置嗎？')) return;
   try {
-    const { data: assignments } = await sb.from('assignments').select('id').eq('class_id', cid);
-    const assignmentIds = (assignments || []).map(a => a.id);
-    if (assignmentIds.length) {
-      await sb.from('submissions').delete().in('assignment_id', assignmentIds);
-    }
+    await forceClearClassSubmissions(cid);
     state.todayChanges = [];
     showToast('✅ 已重置「' + className + '」全部繳交紀錄', 'success');
     // Refresh all views
     await loadClassData();
     renderAll();
   } catch (e) { showToast('重置失敗：' + e.message, 'error'); }
+}
+
+// 強制清除本班所有繳交紀錄（包含作業已不存在後遺留的孤兒紀錄）
+async function forceClearPrompt() {
+  const cid = state.currentClassId;
+  if (!cid) { alert('請先選擇班級'); return; }
+  const cls = state.classes.find(c => c.id === cid);
+  const className = cls ? cls.name : '此班級';
+  if (!confirm('⚠️ 強制資料清理\n\n這會刪除「' + className + '」所有繳交紀錄，包含作業或學生已刪除後遺留的舊資料。\n\n此操作無法復原，確定嗎？')) return;
+  if (!confirm('⚠️ 再次確認\n\n確定要清除「' + className + '」的全部繳交紀錄嗎？')) return;
+  try {
+    await forceClearClassSubmissions(cid);
+    state.todayChanges = [];
+    await loadClassData();
+    renderAll();
+    showToast('✅ 已強制清除「' + className + '」全部繳交紀錄', 'success');
+  } catch (e) { showToast('清除失敗：' + e.message, 'error'); }
+}
+async function forceClearClassSubmissions(cid) {
+  if (!cid) throw new Error('請先選擇班級');
+  // 1. 刪除目前班級所有作業對應的繳交紀錄
+  const { data: assignments } = await sb.from('assignments').select('id').eq('class_id', cid);
+  const assignmentIds = (assignments || []).map(a => a.id);
+  if (assignmentIds.length) {
+    await sb.from('submissions').delete().in('assignment_id', assignmentIds);
+  }
+  // 2. 清理孤兒紀錄：學生已不存在或作業已不存在的繳交紀錄
+  const { data: allSubs } = await sb.from('submissions').select('id, student_id, assignment_id').order('id');
+  const { data: classStudents } = await sb.from('students').select('id').eq('class_id', cid);
+  const { data: classAssignments } = await sb.from('assignments').select('id').eq('class_id', cid);
+  const studentIds = new Set((classStudents || []).map(s => s.id));
+  const classAssignmentIds = new Set((classAssignments || []).map(a => a.id));
+  const orphanIds = (allSubs || []).filter(s => {
+    // 屬於本班學生但作業已不存在，或作業屬於本班但學生已不存在
+    const studentInClass = studentIds.has(s.student_id);
+    const assignmentInClass = classAssignmentIds.has(s.assignment_id);
+    return (studentInClass && !assignmentInClass) || (!studentInClass && assignmentInClass);
+  }).map(s => s.id);
+  if (orphanIds.length) {
+    await sb.from('submissions').delete().in('id', orphanIds);
+  }
 }
 function renderTodayChanges() {
   const el = document.getElementById('todayChangesList');
@@ -1409,7 +1537,7 @@ async function renderReport() {
       html += '<td style="text-align:center;padding:4px 2px;background:' + bg + ';">' + icon + '</td>';
     });
     if (filterId) {
-      const sub = subs.find(x => x.student_id === s.id);
+      const sub = subs.find(x => x.student_id === s.id && x.assignment_id === filterId);
       html += '<td style="padding:6px;text-align:center;font-weight:bold;">' + (sub ? statusLabel(sub.status) : '未繳') + '</td>';
     } else {
       const rate = filteredAssignments.length ? Math.round(rowDone / filteredAssignments.length * 100) : 0;
