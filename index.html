@@ -732,6 +732,7 @@ function renderSettings() {
 async function createSubject() {
   const name = document.getElementById('subjectInput').value.trim();
   if (!name || !state.currentClassId) return;
+  if (state.subjects.some(s => s.name === name)) { showToast('科目「' + name + '」已存在', 'warning'); return; }
   const { error } = await sb.from('subjects').insert([{ class_id: state.currentClassId, name }]);
   if (error) { alert(error.message); return; }
   const si = document.getElementById('subjectInput');
@@ -741,6 +742,7 @@ async function createSubject() {
 }
 async function createPresetSubject(name) {
   if (!name || !state.currentClassId) return;
+  if (state.subjects.some(s => s.name === name)) { showToast('科目「' + name + '」已存在', 'warning'); return; }
   const { error } = await sb.from('subjects').insert([{ class_id: state.currentClassId, name }]);
   if (error) { showToast('新增失敗：' + error.message, 'error'); return; }
   await loadClassData();
