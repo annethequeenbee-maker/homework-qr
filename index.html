@@ -702,6 +702,18 @@ async function createSubject() {
   await loadClassData();
   renderSettings();
 }
+async function createPresetSubject(name) {
+  if (!name || !state.currentClassId) return;
+  const { error } = await sb.from('subjects').insert([{ class_id: state.currentClassId, name }]);
+  if (error) { showToast('新增失敗：' + error.message, 'error'); return; }
+  await loadClassData();
+  renderSettings();
+  showToast('已新增科目「' + name + '」', 'success');
+}
+function setPresetTitle(title) {
+  const el = document.getElementById('hwTitle');
+  if (el) el.value = title;
+}
 async function createAssignment() {
   const title = document.getElementById('hwTitle').value.trim();
   const subjectId = document.getElementById('hwSubject').value;
@@ -712,11 +724,14 @@ async function createAssignment() {
   }]);
   if (error) { alert(error.message); return; }
   const ht = document.getElementById('hwTitle');
-  const hd = document.getElementById('hwDueDate');
   if(ht) ht.value = '';
-  if(hd) hd.value = '';
   await loadClassData();
   renderSettings();
+  // Reset due date to today for next assignment
+  setTimeout(() => {
+    const hd = document.getElementById('hwDueDate');
+    if(hd) hd.value = todayStr();
+  }, 50);
 }
 async function showCreateClassModal() {
   showModal('建立新班級', `<input id="newClassName" placeholder="班級名稱（如：三年一班）" style="width:100%;"><br><br><button onclick="doCreateClass()" class="btn btn-darkblue" style="width:100%;">建立</button>`);
@@ -1313,6 +1328,7 @@ function openSettingsModal() {
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <input id="subjectInput" placeholder="科目名稱（如：國語、數學）" style="flex:1;">
           <button onclick="createSubject()" class="btn btn-green" style="padding:6px 15px;font-size:0.85em;">新增科目</button>
+          <button onclick="createPresetSubject('英語')" class="btn btn-green" style="padding:6px 15px;font-size:0.85em;background:#27ae60;">＋ 英語</button>
         </div>
         <div id="subjectList"></div>
       </div>
@@ -1324,15 +1340,22 @@ function openSettingsModal() {
           <input id="hwTitle" placeholder="作業名稱">
           <input id="hwDueDate" type="date" placeholder="截止日">
         </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          <button onclick="setPresetTitle('第一課單字')" class="btn btn-gray" style="padding:4px 10px;font-size:0.8em;">第一課單字</button>
+          <button onclick="setPresetTitle('第一課句子')" class="btn btn-gray" style="padding:4px 10px;font-size:0.8em;">第一課句子</button>
+          <button onclick="setPresetTitle('小考')" class="btn btn-gray" style="padding:4px 10px;font-size:0.8em;">小考</button>
+        </div>
         <button onclick="createAssignment()" class="btn btn-darkblue" style="padding:6px 15px;font-size:0.85em;">＋ 建立新作業</button>
         <div id="assignmentList" style="margin-top:10px;max-height:160px;overflow-y:auto;"></div>
       </div>
     </div>
   `);
-  // 設定科目預設值
+  // 預設科目為第一個，截止日為今天
   setTimeout(() => {
     const hwSub = document.getElementById('hwSubject');
     if (hwSub && hwSub.options.length > 1) hwSub.selectedIndex = 1;
+    const hwDate = document.getElementById('hwDueDate');
+    if (hwDate && !hwDate.value) hwDate.value = todayStr();
   }, 50);
 }
 function changeFont(fontFamily) {
