@@ -348,6 +348,19 @@ tr:hover { background: #f9f9f9; }
     <div id="todayChangesList" style="max-height: 200px; overflow-y: auto;"></div>
   </div>
 
+  <!-- 每日重置 -->
+  <div class="container">
+    <div style="padding: 15px; background: #fff3cd; border: 2px solid #ff9800; border-radius: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-weight: bold; color: #e65100; font-size: 1em;">🔄 每日重置</div>
+          <div style="font-size: 0.85em; color: #666; margin-top: 4px;">清除本班全部繳交紀錄，明天重新開始</div>
+        </div>
+        <button onclick="dailyReset()" class="btn-red" style="padding: 10px 20px; font-size: 0.95em; font-weight: bold;">🗑️ 重置本日全部紀錄</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 資料匯出 -->
   <div class="container">
     <div class="section-title">☁️ 資料匯出</div>
@@ -1254,6 +1267,26 @@ function clearTodayStats() {
   state.todayChanges = [];
   renderTodayChanges();
   showToast('已清除當日統計顯示', 'success');
+}
+async function dailyReset() {
+  const cid = state.currentClassId;
+  if (!cid) { alert('請先選擇班級'); return; }
+  const cls = state.classes.find(c => c.id === cid);
+  const className = cls ? cls.name : '此班級';
+  if (!confirm('⚠️ 每日重置\n\n確定要清除「' + className + '」全部繳交紀錄嗎？\n\n所有學生的繳交狀態將回到「未繳」。')) return;
+  if (!confirm('⚠️ 再次確認\n\n這個操作無法復原，確定要重置嗎？')) return;
+  try {
+    const { data: assignments } = await sb.from('assignments').select('id').eq('class_id', cid);
+    const assignmentIds = (assignments || []).map(a => a.id);
+    if (assignmentIds.length) {
+      await sb.from('submissions').delete().in('assignment_id', assignmentIds);
+    }
+    state.todayChanges = [];
+    showToast('✅ 已重置「' + className + '」全部繳交紀錄', 'success');
+    // Refresh all views
+    await loadClassData();
+    renderAll();
+  } catch (e) { showToast('重置失敗：' + e.message, 'error'); }
 }
 function renderTodayChanges() {
   const el = document.getElementById('todayChangesList');
