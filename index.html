@@ -161,7 +161,6 @@ tr:hover { background: #f9f9f9; }
     <select id="classSelect" onchange="onClassChange(parseInt(this.value))"><option value="">-- 切換班級 --</option></select>
     <button onclick="showCreateClassModal()" class="btn-primary">＋ 新班級</button>
     <span id="teacherDisplay" style="font-weight:bold;"></span>
-    <button onclick="switchTeacher()" class="btn-secondary">👤 切換</button>
     <button onclick="logout()" class="btn-secondary">× 登出</button>
   </div>
 </header>
@@ -631,9 +630,12 @@ function renderSettings() {
     if (!state.students.length) { el.innerHTML = '<div style="color:#999;text-align:center;width:100%;">尚未匯入學生</div>'; }
     else {
       el.innerHTML = state.students.map(s => `
-        <div style="padding:8px;text-align:center;border:1px solid #e0e0e0;border-radius:6px;background:#fafafa;">
-          <div style="font-weight:bold;font-size:1.1em;">${s.student_number}</div>
-          <div style="font-size:0.85em;">${s.name}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;background:#fafafa;margin-bottom:5px;">
+          <div>
+            <span style="font-weight:bold;font-size:1.1em;">${s.student_number}</span>
+            <span style="font-size:0.9em;margin-left:8px;">${s.name}</span>
+          </div>
+          <button onclick="deleteStudent(${s.id})" class="btn btn-red" style="padding:2px 8px;font-size:0.75em;">🗑️ 刪除</button>
         </div>
       `).join('');
     }
@@ -781,6 +783,21 @@ async function doEditAssignment(aid) {
     renderSettings();
     showToast('作業已更新', 'success');
   } catch (e) { showToast('更新失敗：' + e.message, 'error'); }
+}
+async function deleteStudent(sid) {
+  const s = state.students.find(x => x.id === sid);
+  if (!s) return;
+  if (!confirm('確定要刪除學生「' + s.name + '（' + s.student_number + '號）」嗎？')) return;
+  try {
+    // Delete student's submissions first
+    await sb.from('submissions').delete().eq('student_id', sid);
+    // Then delete the student
+    const { error } = await sb.from('students').delete().eq('id', sid);
+    if (error) throw error;
+    await loadClassData();
+    renderSettings();
+    showToast('學生已刪除', 'success');
+  } catch (e) { showToast('刪除失敗：' + e.message, 'error'); }
 }
 async function deleteAssignment(aid) {
   const a = state.assignments.find(x => x.id === aid);
