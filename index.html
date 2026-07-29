@@ -546,12 +546,17 @@ async function onClassChange(id) {
   state.currentClassId = id;
   localStorage.setItem('last_class_id', id);
   await loadClassData();
+  // Clear assignment grids and re-render everything
+  const gridA = document.getElementById('submitStudentGridA');
+  const gridB = document.getElementById('submitStudentGridB');
+  if (gridA) gridA.innerHTML = '';
+  if (gridB) gridB.innerHTML = '';
   renderAll();
   const cls = state.classes.find(c => c.id === id);
   const classDisplay = document.getElementById('currentClassDisplay');
   if (cls && classDisplay) {
     classDisplay.textContent = cls.name;
-    showToast('已切換到「' + cls.name + '」', 'info');
+    showToast('已切換到「' + cls.name + '」(' + state.students.length + '人)', 'info');
   }
 }
 async function loadClassData() {
