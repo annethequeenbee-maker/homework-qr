@@ -578,7 +578,6 @@ function switchTab(tab) {
   document.querySelectorAll('#mainTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   if (tab === 'assignment-a') {
     state.currentAssignmentSlot = 'A';
-    state.activeOptionStudent = null;
     state.batchSelected.clear();
     updateBatchUI();
     const aidA = document.getElementById('submitAssignmentSelectA').value;
@@ -586,7 +585,6 @@ function switchTab(tab) {
   }
   if (tab === 'assignment-b') {
     state.currentAssignmentSlot = 'B';
-    state.activeOptionStudent = null;
     state.batchSelected.clear();
     updateBatchUI();
     const aidB = document.getElementById('submitAssignmentSelectB').value;
