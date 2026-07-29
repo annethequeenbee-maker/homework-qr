@@ -160,6 +160,7 @@ tr:hover { background: #f9f9f9; }
     </div>
     <select id="classSelect" onchange="onClassChange(parseInt(this.value))"><option value="">-- 切換班級 --</option></select>
     <button onclick="showCreateClassModal()" class="btn-primary">＋ 新班級</button>
+    <button onclick="deleteCurrentClass()" class="btn-red" style="padding: 6px 15px; font-size: 0.9em;">🗑️ 刪除班級</button>
 
   </div>
 </header>
@@ -768,6 +769,33 @@ async function doCreateClass() {
   if (error) { alert(error.message); return; }
   closeModal();
   await loadClasses();
+}
+async function deleteCurrentClass() {
+  const cid = state.currentClassId;
+  if (!cid) { alert('請先選擇班級'); return; }
+  const cls = state.classes.find(c => c.id === cid);
+  if (!cls) return;
+  if (!confirm('確定要刪除班級「' + cls.name + '」嗎？\n\n⚠️ 所有學生、作業、繳交紀錄、科目都會一併刪除！')) return;
+  try {
+    // Delete all submissions for this class's assignments
+    const { data: assignments } = await sb.from('assignments').select('id').eq('class_id', cid);
+    const assignmentIds = (assignments || []).map(a => a.id);
+    if (assignmentIds.length) await sb.from('submissions').delete().in('assignment_id', assignmentIds);
+    // Delete students
+    await sb.from('students').delete().eq('class_id', cid);
+    // Delete assignments
+    await sb.from('assignments').delete().eq('class_id', cid);
+    // Delete subjects
+    await sb.from('subjects').delete().eq('class_id', cid);
+    // Delete class
+    const { error } = await sb.from('classes').delete().eq('id', cid);
+    if (error) throw error;
+    state.currentClassId = null;
+    localStorage.removeItem('last_class_id');
+    await loadClasses();
+    renderAll();
+    showToast('班級已刪除', 'success');
+  } catch (e) { showToast('刪除失敗：' + e.message, 'error'); }
 }
 
 // ===== 作業編輯 / 刪除 =====
