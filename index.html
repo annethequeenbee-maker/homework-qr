@@ -1246,6 +1246,11 @@ function setReportFilter(value) {
   renderReport();
 }
 function clearTodayStats() {
+  if (!state.todayChanges || !state.todayChanges.length) {
+    alert('目前沒有今日異動紀錄可以清除');
+    return;
+  }
+  if (!confirm('確定要清除全部 ' + state.todayChanges.length + ' 筆今日異動紀錄嗎？')) return;
   state.todayChanges = [];
   renderTodayChanges();
   showToast('已清除當日統計顯示', 'success');
@@ -1253,8 +1258,8 @@ function clearTodayStats() {
 function renderTodayChanges() {
   const el = document.getElementById('todayChangesList');
   if (!el) return;
-  if (!state.todayChanges.length) {
-    el.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">今日尚無異動紀錄</div>';
+  if (!state.todayChanges || !state.todayChanges.length) {
+    el.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">今日尚無異動紀錄<br><span style="font-size:0.8em;">（點擊作業 A/B 的學生後會自動記錄在此）</span></div>';
     return;
   }
   el.innerHTML = state.todayChanges.map(c => {
