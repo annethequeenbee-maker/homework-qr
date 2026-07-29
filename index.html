@@ -1653,6 +1653,12 @@ window.addEventListener('scroll', () => {
 // ============================================================
 function renderAll() {
   renderSettings();
+  // Refresh submit grids if they have an assignment selected
+  const aidA = document.getElementById('submitAssignmentSelectA').value;
+  if (aidA) renderSubmitGrid(parseInt(aidA), 'submitStudentGridA', 'submitEmptyA');
+  const aidB = document.getElementById('submitAssignmentSelectB').value;
+  if (aidB) renderSubmitGrid(parseInt(aidB), 'submitStudentGridB', 'submitEmptyB');
+  // Update correction and report if those tabs are active
   const tc = document.getElementById('tab-correction');
   const tr = document.getElementById('tab-report');
   if (tc && tc.classList.contains('active')) renderCorrection();
