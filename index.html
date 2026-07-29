@@ -461,8 +461,9 @@ async function onClassChange(id) {
   await loadClassData();
   renderAll();
   const cls = state.classes.find(c => c.id === id);
-  if (cls) {
-    document.getElementById('currentClassDisplay').textContent = cls.name;
+  const classDisplay = document.getElementById('currentClassDisplay');
+  if (cls && classDisplay) {
+    classDisplay.textContent = cls.name;
     showToast('已切換到「' + cls.name + '」', 'info');
   }
 }
@@ -609,16 +610,19 @@ function renderSettings() {
       `).join('');
     }
   }
-  // 繳交頁面的作業下拉 A 和 B
+  // 繳交頁面的作業下拉 A 和 B（安全更新）
   const opts = '<option value="">-- 請選擇作業 --</option>' + state.assignments.map(a => {
     const subName = a.subjects ? a.subjects.name : '';
     return `<option value="${a.id}">${subName ? '['+subName+'] ' : ''}${a.title}（截止：${a.due_date || '無'}）</option>`;
   }).join('');
-  document.getElementById('submitAssignmentSelectA').innerHTML = opts;
-  document.getElementById('submitAssignmentSelectB').innerHTML = opts;
+  const selA = document.getElementById('submitAssignmentSelectA');
+  if (selA) selA.innerHTML = opts;
+  const selB = document.getElementById('submitAssignmentSelectB');
+  if (selB) selB.innerHTML = opts;
   // 更新 Header 目前班級顯示
   const cls = state.classes.find(c => c.id === state.currentClassId);
-  document.getElementById('currentClassDisplay').textContent = cls ? cls.name : '--';
+  const classDisplay = document.getElementById('currentClassDisplay');
+  if (classDisplay) classDisplay.textContent = cls ? cls.name : '--';
 }
 
 // ============================================================
