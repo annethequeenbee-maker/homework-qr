@@ -915,6 +915,8 @@ function clearBatchSelection() {
 async function batchMark(newStatus) {
   if (state.batchSelected.size === 0) { alert('請先勾選學生'); return; }
   const sidList = Array.from(state.batchSelected);
+  const label = statusLabel(newStatus);
+  if (!confirm('確定要批量標記 ' + sidList.length + ' 位學生為「' + label + '」嗎？')) return;
   const aid = state.currentAssignmentId;
   if (!aid) { alert('請先選擇作業'); return; }
   try {
