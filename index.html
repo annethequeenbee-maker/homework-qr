@@ -893,15 +893,20 @@ async function loadSubmitViewB() {
   await renderSubmitGrid(aid, 'submitStudentGridB', 'submitEmptyB');
 }
 async function renderSubmitGrid(aid, gridId, emptyId) {
-  if (!state.students.length) return;
+  const grid = document.getElementById(gridId);
+  const emptyEl = document.getElementById(emptyId);
+  if (!grid) return;
+  if (!state.students.length) {
+    grid.innerHTML = '';
+    if(emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
   const { data: subs } = await sb.from('submissions').select('*').eq('assignment_id', aid);
   const subsMap = {};
   (subs || []).forEach(s => { subsMap[s.student_id] = s; });
   const today = todayStr();
   const assignment = state.assignments.find(a => a.id === aid);
   const isPastDue = assignment && assignment.due_date && assignment.due_date < today;
-  const grid = document.getElementById(gridId);
-  const emptyEl = document.getElementById(emptyId);
   if(emptyEl) emptyEl.classList.add('hidden');
   grid.innerHTML = state.students.map(s => {
     const sub = subsMap[s.id];
