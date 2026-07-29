@@ -1324,39 +1324,63 @@ async function renderReport() {
   `;
   
   // Table
-  let html = '<table><thead><tr><th>座號</th><th>姓名</th>';
-  filteredAssignments.forEach(a => { html += '<th>' + a.title + '</th>'; });
-  if (filterId) html += '<th>狀態</th>';
-  else html += '<th>完成率</th>';
+  let html = '<div style="overflow-x:auto;margin-top:15px;"><table style="font-size:0.85em;border-collapse:collapse;width:100%;">';
+  html += '<thead><tr style="background:#1d4e89;color:#fff;">';
+  html += '<th style="padding:8px 6px;position:sticky;left:0;background:#1d4e89;z-index:1;">座號</th>';
+  html += '<th style="padding:8px 6px;min-width:55px;">姓名</th>';
+  filteredAssignments.forEach(a => {
+    html += '<th style="padding:6px 4px;writing-mode:vertical-lr;letter-spacing:1px;min-width:28px;">' + a.title + '</th>';
+  });
+  if (filterId) html += '<th style="padding:8px 6px;">狀態</th>';
+  else html += '<th style="padding:8px 6px;">%</th>';
   html += '</tr></thead><tbody>';
-  (students || []).forEach(s => {
-    html += '<tr><td>' + s.student_number + '</td><td>' + s.name + '</td>';
-    let done = 0;
+  
+  // Column totals for summary row
+  const colTotals = {};
+  filteredAssignments.forEach(a => { colTotals[a.id] = { submitted:0, late:0, corrected:0, needs_correction:0, missing:0, pending:0 }; });
+  
+  (students || []).forEach((s, idx) => {
+    let rowDone = 0;
+    html += '<tr style="background:' + (idx%2===0?'#fff':'#f8fafc') + ';">';
+    html += '<td style="padding:6px;text-align:center;font-weight:bold;position:sticky;left:0;background:' + (idx%2===0?'#fff':'#f8fafc') + ';z-index:1;">' + s.student_number + '</td>';
+    html += '<td style="padding:6px;white-space:nowrap;">' + s.name + '</td>';
     filteredAssignments.forEach(a => {
       const sub = subs.find(x => x.student_id === s.id && x.assignment_id === a.id);
-      let cell = '○';
+      let st = 'pending', icon = '○', bg = '#f5f5f5';
       if (sub) {
-        if (sub.status === 'submitted') { cell = '✅'; done++; }
-        else if (sub.status === 'late') { cell = '⚠️'; done++; }
-        else if (sub.status === 'corrected') { cell = '✔️'; done++; }
-        else if (sub.status === 'needs_correction') cell = '📝';
-        else if (sub.status === 'missing') cell = '❌';
-      } else if (a.due_date && a.due_date < todayStr()) {
-        cell = '❌'; 
-      }
-      html += '<td>' + cell + '</td>';
+        st = sub.status;
+        if (st === 'submitted') { icon = '✅'; bg = '#e8f5e9'; rowDone++; }
+        else if (st === 'late') { icon = '⚠️'; bg = '#fce4ec'; rowDone++; }
+        else if (st === 'corrected') { icon = '✔️'; bg = '#e3f2fd'; rowDone++; }
+        else if (st === 'needs_correction') { icon = '📝'; bg = '#fff3cd'; }
+        else if (st === 'missing') { icon = '❌'; bg = '#ffebee'; }
+      } else if (a.due_date && a.due_date < todayStr()) { st = 'missing'; icon = '❌'; bg = '#ffebee'; }
+      if (colTotals[a.id] && colTotals[a.id][st] !== undefined) colTotals[a.id][st]++;
+      html += '<td style="text-align:center;padding:4px 2px;background:' + bg + ';">' + icon + '</td>';
     });
     if (filterId) {
       const sub = subs.find(x => x.student_id === s.id);
-      const st = sub ? statusLabel(sub.status) : '未繳';
-      html += '<td>' + st + '</td>';
+      html += '<td style="padding:6px;text-align:center;font-weight:bold;">' + (sub ? statusLabel(sub.status) : '未繳') + '</td>';
     } else {
-      const rate = filteredAssignments.length ? Math.round(done / filteredAssignments.length * 100) : 0;
-      html += '<td>' + rate + '%</td>';
+      const rate = filteredAssignments.length ? Math.round(rowDone / filteredAssignments.length * 100) : 0;
+      html += '<td style="padding:6px;text-align:center;font-weight:bold;color:' + (rate===100?'#4caf50':rate>=50?'#ff9800':'#f44336') + ';">' + rate + '%</td>';
     }
     html += '</tr>';
   });
-  html += '</tbody></table>';
+  
+  // Summary row
+  html += '<tr style="background:#e3f2fd;font-weight:bold;border-top:2px solid #1d4e89;">';
+  html += '<td colspan="2" style="padding:6px;text-align:center;">全班統計</td>';
+  filteredAssignments.forEach(a => {
+    const t = colTotals[a.id] || {};
+    const done = (t.submitted||0) + (t.late||0) + (t.corrected||0);
+    const total = done + (t.missing||0) + (t.pending||0) + (t.needs_correction||0);
+    html += '<td style="text-align:center;padding:4px 2px;font-size:0.8em;">' + (total ? Math.round(done/total*100) + '%' : '-') + '</td>';
+  });
+  html += '<td style="padding:6px;text-align:center;">' + (students||[]).length + '人</td>';
+  html += '</tr>';
+  
+  html += '</tbody></table></div>';
   const rt = document.getElementById('reportTable');
   if(rt) rt.innerHTML = html;
   // Render today's changes
