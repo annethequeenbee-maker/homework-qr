@@ -325,11 +325,29 @@ tr:hover { background: #f9f9f9; }
 
 <!-- 📊 報表頁面 -->
 <div id="tab-report" class="tab-panel">
+  <!-- 統計範圍選擇 -->
   <div class="container">
-    <div class="section-title">📊 全班繳交統計</div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #1d4e89;">📊 統計範圍：</label>
+      <select id="reportAssignmentFilter" onchange="setReportFilter(this.value)" style="min-width: 200px;">
+        <option value="all">全部作業</option>
+      </select>
+      <button onclick="renderReport()" class="btn btn-blue" style="padding: 6px 15px; font-size: 0.85em;">🔄 重整報表</button>
+    </div>
     <div id="reportStats" class="stat-cards"></div>
     <div id="reportTable"></div>
   </div>
+
+  <!-- 今日異動紀錄 -->
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <div class="section-title" style="margin: 0;">📅 今日異動紀錄</div>
+      <button onclick="clearTodayStats()" class="btn btn-red" style="padding: 6px 15px; font-size: 0.85em;">🗑️ 清除當日統計</button>
+    </div>
+    <div id="todayChangesList" style="max-height: 200px; overflow-y: auto;"></div>
+  </div>
+
+  <!-- 資料匯出 -->
   <div class="container">
     <div class="section-title">☁️ 資料匯出</div>
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -389,7 +407,9 @@ let state = {
   currentAssignmentId: null,
   currentAssignmentSlot: 'A',
   batchMode: false,
-  batchSelected: new Set()
+  batchSelected: new Set(),
+  todayChanges: [],
+  reportAssignmentFilter: 'all'
 };
 
 // ============================================================
@@ -949,6 +969,20 @@ async function batchMark(newStatus) {
       }
       count++;
     }
+    // Track today's changes for batch
+    const assignment = state.assignments.find(a => a.id === aid);
+    const now = nowStr();
+    sidList.forEach(sid => {
+      const student = state.students.find(s => s.id === sid);
+      state.todayChanges.unshift({
+        time: now.split(' ')[1],
+        studentName: student ? student.name : '',
+        studentNum: student ? student.student_number : '',
+        assignmentTitle: assignment ? assignment.title : '',
+        status: finalStatus
+      });
+    });
+    if (state.todayChanges.length > 50) state.todayChanges = state.todayChanges.slice(0, 50);
     showToast('✅ 已批量標記 ' + count + ' 位學生為「' + statusLabel(finalStatus) + '」', 'success');
     state.batchSelected.clear();
     updateBatchUI();
@@ -989,8 +1023,18 @@ async function doMark(sid, newStatus) {
     } else if (finalStatus !== 'pending') {
       await sb.from('submissions').insert({ assignment_id: state.currentAssignmentId, student_id: sid, status: finalStatus, submitted_at: now });
     }
-    // Show toast
+    // Track today's change
     const student = state.students.find(s => s.id === sid);
+    const assignment = state.assignments.find(a => a.id === state.currentAssignmentId);
+    state.todayChanges.unshift({
+      time: now.split(' ')[1],
+      studentName: student ? student.name : '',
+      studentNum: student ? student.student_number : '',
+      assignmentTitle: assignment ? assignment.title : '',
+      status: finalStatus
+    });
+    if (state.todayChanges.length > 50) state.todayChanges.pop();
+    // Show toast
     const timeStr = now.split(' ')[1];
     showToast(student.name + ' ' + statusLabel(finalStatus) + '（' + timeStr + '）', 'success');
     // Reload both grids
@@ -1133,12 +1177,55 @@ async function toggleCorrection(submissionId, newStatus) {
 // ============================================================
 // 報表頁面
 // ============================================================
+function setReportFilter(value) {
+  state.reportAssignmentFilter = value;
+  renderReport();
+}
+function clearTodayStats() {
+  state.todayChanges = [];
+  renderTodayChanges();
+  showToast('已清除當日統計顯示', 'success');
+}
+function renderTodayChanges() {
+  const el = document.getElementById('todayChangesList');
+  if (!el) return;
+  if (!state.todayChanges.length) {
+    el.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">今日尚無異動紀錄</div>';
+    return;
+  }
+  el.innerHTML = state.todayChanges.map(c => {
+    const color = { submitted:'#4caf50', missing:'#f44336', needs_correction:'#ff9800', corrected:'#2196f3', late:'#9c27b0', pending:'#9e9e9e' }[c.status];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #eee;font-size:0.9em;">
+      <span style="color:#999;font-size:0.85em;min-width:45px;">${c.time}</span>
+      <span style="min-width:60px;">${c.studentNum}號</span>
+      <span style="flex:1;">${c.studentName}</span>
+      <span style="color:#666;font-size:0.85em;">${c.assignmentTitle}</span>
+      <span style="font-weight:bold;color:${color};">${statusLabel(c.status)}</span>
+    </div>`;
+  }).join('');
+}
 async function renderReport() {
   if (!state.currentClassId) return;
   const cid = state.currentClassId;
   const { data: students } = await sb.from('students').select('*').eq('class_id', cid).order('student_number');
   const { data: assignments } = await sb.from('assignments').select('*').eq('class_id', cid).order('id');
-  const assignmentIds = (assignments || []).map(a => a.id);
+  
+  // Update filter dropdown options
+  const filterSel = document.getElementById('reportAssignmentFilter');
+  if (filterSel) {
+    const currentVal = filterSel.value;
+    let opts = '<option value="all">全部作業</option>';
+    (assignments || []).forEach(a => { opts += `<option value="${a.id}">${a.title}</option>`; });
+    filterSel.innerHTML = opts;
+    if (state.reportAssignmentFilter !== 'all') {
+      filterSel.value = state.reportAssignmentFilter;
+    }
+  }
+  
+  const filterId = state.reportAssignmentFilter === 'all' ? null : parseInt(state.reportAssignmentFilter);
+  const filteredAssignments = filterId ? (assignments || []).filter(a => a.id === filterId) : (assignments || []);
+  
+  const assignmentIds = filteredAssignments.map(a => a.id);
   let subs = [];
   if (assignmentIds.length) {
     const { data } = await sb.from('submissions').select('*').in('assignment_id', assignmentIds);
@@ -1147,7 +1234,7 @@ async function renderReport() {
   // Stats
   let submitted = 0, missing = 0, needsCorr = 0, corrected = 0, pending = 0, late = 0;
   (students || []).forEach(s => {
-    (assignments || []).forEach(a => {
+    filteredAssignments.forEach(a => {
       const sub = subs.find(x => x.student_id === s.id && x.assignment_id === a.id);
       if (!sub) {
         if (a.due_date && a.due_date < todayStr()) missing++;
@@ -1162,7 +1249,6 @@ async function renderReport() {
       }
     });
   });
-  const total = submitted + missing + needsCorr + corrected + late + pending;
   const rs = document.getElementById('reportStats');
   if(rs) rs.innerHTML = `
     <div class="stat-card" style="background:#4caf50;"><div class="number">${submitted}</div><div class="label">已繳交</div></div>
@@ -1172,14 +1258,17 @@ async function renderReport() {
     <div class="stat-card" style="background:#9c27b0;"><div class="number">${late}</div><div class="label">遲交</div></div>
     <div class="stat-card" style="background:#9e9e9e;"><div class="number">${pending}</div><div class="label">未繳</div></div>
   `;
+  
   // Table
   let html = '<table><thead><tr><th>座號</th><th>姓名</th>';
-  (assignments || []).forEach(a => { html += '<th>' + a.title + '</th>'; });
-  html += '<th>完成率</th></tr></thead><tbody>';
+  filteredAssignments.forEach(a => { html += '<th>' + a.title + '</th>'; });
+  if (filterId) html += '<th>狀態</th>';
+  else html += '<th>完成率</th>';
+  html += '</tr></thead><tbody>';
   (students || []).forEach(s => {
     html += '<tr><td>' + s.student_number + '</td><td>' + s.name + '</td>';
     let done = 0;
-    (assignments || []).forEach(a => {
+    filteredAssignments.forEach(a => {
       const sub = subs.find(x => x.student_id === s.id && x.assignment_id === a.id);
       let cell = '○';
       if (sub) {
@@ -1193,12 +1282,21 @@ async function renderReport() {
       }
       html += '<td>' + cell + '</td>';
     });
-    const rate = assignments.length ? Math.round(done / assignments.length * 100) : 0;
-    html += '<td>' + rate + '%</td></tr>';
+    if (filterId) {
+      const sub = subs.find(x => x.student_id === s.id);
+      const st = sub ? statusLabel(sub.status) : '未繳';
+      html += '<td>' + st + '</td>';
+    } else {
+      const rate = filteredAssignments.length ? Math.round(done / filteredAssignments.length * 100) : 0;
+      html += '<td>' + rate + '%</td>';
+    }
+    html += '</tr>';
   });
   html += '</tbody></table>';
   const rt = document.getElementById('reportTable');
   if(rt) rt.innerHTML = html;
+  // Render today's changes
+  renderTodayChanges();
 }
 
 // ============================================================
